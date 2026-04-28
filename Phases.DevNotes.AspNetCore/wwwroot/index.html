@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dev Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/devnotes/styles.css" />
+</head>
+<body>
+    <main class="container dashboard">
+        <section class="panel notes-panel">
+            <header class="notes-header">
+                <div class="notes-header__title">
+                    <h1 class="app-title">Dev Notes</h1>
+                    <p class="subtitle">Capture quick development notes while building.</p>
+                </div>
+                <div class="notes-actions">
+                    <button id="add-note-btn" class="add-note-btn" type="button">Add Note</button>
+                    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">Dark mode</button>
+                    <input id="search" type="search" placeholder="Search title, description, tags..." aria-label="Search notes" autocomplete="off" />
+                    <select id="filter-type" aria-label="Filter notes by type">
+                        <option value="all">All types</option>
+                        <option value="bug">Bug</option>
+                        <option value="idea">Idea</option>
+                        <option value="task">Task</option>
+                    </select>
+                    <select id="sort-order" aria-label="Sort notes">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                    </select>
+                </div>
+            </header>
+            <div id="status" class="status" aria-live="polite" role="status"></div>
+            <div id="notes-summary" class="notes-summary" aria-live="polite"></div>
+            <div id="notes" class="notes" aria-live="polite"></div>
+            <footer class="pagination" aria-label="Notes pagination">
+                <button id="prev-page" type="button" aria-label="Previous page">Previous</button>
+                <span id="page-indicator" class="pagination__indicator" aria-live="polite">Page 1 of 1</span>
+                <button id="next-page" type="button" aria-label="Next page">Next</button>
+            </footer>
+        </section>
+    </main>
+
+    <div id="note-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <article class="modal" data-modal-content>
+            <header class="modal__header">
+                <h3 id="modal-title" class="modal-title"></h3>
+                <button id="modal-close" class="modal-close" type="button" aria-label="Close note details">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+
+            <section class="modal-section modal-section--description">
+                <h4 class="modal-section-title">Description</h4>
+                <div id="modal-description" class="modal-description"></div>
+            </section>
+
+            <section class="modal-section modal-section--metadata">
+                <h4 class="modal-section-title">Metadata</h4>
+                <div class="modal-meta-items">
+                    <div id="modal-type" class="meta meta--type"></div>
+                    <div id="modal-tags" class="meta meta--tags"></div>
+                    <div id="modal-created" class="meta meta--created"></div>
+                </div>
+            </section>
+
+            <section id="modal-attachments-section" class="modal-section modal-section--attachments">
+                <h4 class="modal-section-title">Attachments</h4>
+                <div id="modal-attachment" class="modal-attachment"></div>
+            </section>
+        </article>
+    </div>
+
+    <div id="composer-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="composer-title">
+        <article class="modal composer-modal">
+            <header class="modal__header">
+                <h2 id="composer-title" class="modal-title">Add Note</h2>
+                <button id="composer-close-btn" class="modal-close" type="button" aria-label="Close note form">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <form id="note-form" class="note-form composer-form">
+                <label for="title">Title</label>
+                <input id="title" name="title" type="text" placeholder="Short note title" required />
+
+                <label for="description">Description</label>
+                <div class="rte">
+                    <div class="rte-toolbar" role="toolbar" aria-label="Description formatting">
+                        <button type="button" class="rte-btn" data-rte-command="bold" aria-label="Bold"><strong>B</strong></button>
+                        <button type="button" class="rte-btn" data-rte-command="italic" aria-label="Italic"><em>I</em></button>
+                        <button type="button" class="rte-btn" data-rte-command="insertUnorderedList" aria-label="Bullet list">• List</button>
+                    </div>
+                    <div
+                        id="description-editor"
+                        class="rte-editor"
+                        contenteditable="true"
+                        role="textbox"
+                        aria-label="Description"
+                        data-placeholder="What did you find, build, or fix?"></div>
+                </div>
+
+                <label for="type">Type</label>
+                <input id="type" name="type" type="text" placeholder="bug, idea, task..." />
+
+                <label for="tags">Tags</label>
+                <input id="tags" name="tags" type="text" placeholder="api, auth, perf" />
+
+                <label for="attachment">Attachment (optional)</label>
+                <input id="attachment" name="attachment" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" />
+
+                <div class="form-actions">
+                    <button id="submit-btn" type="submit">Add Note</button>
+                    <button id="cancel-edit-btn" type="button" class="secondary-btn hidden">Cancel Edit</button>
+                </div>
+            </form>
+        </article>
+    </div>
+
+    <script src="/devnotes/app.js"></script>
+</body>
+</html>

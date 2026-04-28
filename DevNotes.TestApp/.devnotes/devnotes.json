@@ -1,0 +1,24 @@
+[
+  {
+    "id": "558581c9-ef84-4682-b5d3-677fce749bf6",
+    "title": "test",
+    "description": "test",
+    "type": "idea",
+    "filePath": "",
+    "tags": [
+      "idea"
+    ],
+    "createdAt": "2026-04-28T10:02:59.0361972Z"
+  },
+  {
+    "id": "5f1b0ffa-e3b6-44ff-a779-bf5251c659d4",
+    "title": "test",
+    "description": "test\u003Cp\u003E\u003Cimg src=\u0022/devnotes/uploads/5b83563d3560405e9c9f30c2568e00a6.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
+    "type": "bug",
+    "filePath": "",
+    "tags": [
+      "fix"
+    ],
+    "createdAt": "2026-04-28T10:03:19.7106886Z"
+  }
+]

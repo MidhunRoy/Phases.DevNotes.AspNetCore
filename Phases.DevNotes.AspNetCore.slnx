@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DevNotes.TestApp/DevNotes.TestApp.csproj" Id="a4090505-bd15-48af-9505-fdca4f68a3c5" />
+  <Project Path="Phases.DevNotes.AspNetCore/Phases.DevNotes.AspNetCore.csproj" />
+</Solution>
