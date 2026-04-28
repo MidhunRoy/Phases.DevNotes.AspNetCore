@@ -24,6 +24,7 @@ namespace Phases.DevNotes.AspNetCore.Extensions
                 options.RoutePrefix = NormalizeRoutePrefix(options.RoutePrefix);
                 options.DataFolderName = string.IsNullOrWhiteSpace(options.DataFolderName) ? ".devnotes" : options.DataFolderName.Trim();
                 options.UploadsFolderName = string.IsNullOrWhiteSpace(options.UploadsFolderName) ? "uploads" : options.UploadsFolderName.Trim();
+                options.DefaultCreatedBy = options.DefaultCreatedBy?.Trim() ?? string.Empty;
             });
 
             services.TryAddSingleton<JsonStorageProvider<DevNote>>();

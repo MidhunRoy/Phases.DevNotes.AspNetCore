@@ -4,7 +4,11 @@
     "title": "test",
     "description": "test",
     "type": "idea",
+    "createdBy": "",
+    "attachment": "",
     "filePath": "",
+    "methodName": "",
+    "lineNumber": null,
     "tags": [
       "idea"
     ],
@@ -15,10 +19,132 @@
     "title": "test",
     "description": "test\u003Cp\u003E\u003Cimg src=\u0022/devnotes/uploads/5b83563d3560405e9c9f30c2568e00a6.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
     "type": "bug",
+    "createdBy": "",
+    "attachment": "",
     "filePath": "",
+    "methodName": "",
+    "lineNumber": null,
     "tags": [
       "fix"
     ],
     "createdAt": "2026-04-28T10:03:19.7106886Z"
+  },
+  {
+    "id": "424add2a-ccdf-4830-9a42-614c58e630db",
+    "title": "test",
+    "description": "test\u003Cbr\u003E\u003Cp\u003E\u003Cimg src=\u0022/devnotes/uploads/656fbe53c9fa4a488e51d09af880601b.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
+    "type": "bug",
+    "createdBy": "",
+    "attachment": "",
+    "filePath": "appsettings.Development.json",
+    "methodName": "",
+    "lineNumber": null,
+    "tags": [
+      "fix"
+    ],
+    "createdAt": "2026-04-28T11:23:50.8593425Z"
+  },
+  {
+    "id": "b0c71fa7-b90c-4286-b244-707834f1284a",
+    "title": "Test",
+    "description": "Test",
+    "type": "bug",
+    "createdBy": "",
+    "attachment": "",
+    "filePath": "/devnotes/uploads/a4d2823988a440dbacbf2495d9560184.png",
+    "methodName": "",
+    "lineNumber": null,
+    "tags": [
+      "fix"
+    ],
+    "createdAt": "2026-04-28T11:37:05.698621Z"
+  },
+  {
+    "id": "a8d55af7-feca-44a7-9ddc-b05b5faed597",
+    "title": "test",
+    "description": "test\u003Cbr\u003E\u003Cp\u003E\u003Cimg src=\u0022/devnotes/uploads/ee9094fa3dbd434f99d46aebfe44c663.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
+    "type": "bug",
+    "createdBy": "Midhun",
+    "attachment": "",
+    "filePath": "Program.cs",
+    "methodName": "",
+    "lineNumber": null,
+    "tags": [
+      "fix"
+    ],
+    "createdAt": "2026-04-28T11:53:27.9770411Z"
+  },
+  {
+    "id": "9065d7d9-8dad-4b98-b700-5e4abe26681a",
+    "title": "This is",
+    "description": "\u003Cp\u003Etest\u003Cbr\u003E\u003Cimg src=\u0022/devnotes/uploads/1242e2d4f0434600b80c4bc4b24be3ce.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
+    "type": "idea",
+    "createdBy": "Raj",
+    "attachment": "",
+    "filePath": "appsettings.json",
+    "methodName": "test",
+    "lineNumber": 52,
+    "tags": [
+      "idea"
+    ],
+    "createdAt": "2026-04-28T11:54:20.8924741Z"
+  },
+  {
+    "id": "2c84bf2d-26c3-4600-943a-da8f5e86cedb",
+    "title": "test",
+    "description": "test",
+    "type": "idea",
+    "createdBy": "Raj",
+    "attachment": "",
+    "filePath": "appsettings.json",
+    "methodName": "test",
+    "lineNumber": 52,
+    "tags": [
+      "idea"
+    ],
+    "createdAt": "2026-04-28T11:59:40.141916Z"
+  },
+  {
+    "id": "6e3d5fe4-7312-4a37-94e2-126dcef82381",
+    "title": "then",
+    "description": "then",
+    "type": "idea",
+    "createdBy": "Raj",
+    "attachment": "",
+    "filePath": "appsettings.json",
+    "methodName": "test",
+    "lineNumber": 52,
+    "tags": [
+      "idea"
+    ],
+    "createdAt": "2026-04-28T12:00:15.6809089Z"
+  },
+  {
+    "id": "87fe3f06-0d41-414b-9248-10ef2278b515",
+    "title": "Name Git",
+    "description": "Name Git\u003Cbr\u003E\u003Cp\u003E\u003Cimg src=\u0022/devnotes/uploads/f0332823cd2d460ebe61f6da72666615.png\u0022 alt=\u0022Pasted image\u0022 loading=\u0022lazy\u0022 class=\u0022description-image\u0022\u003E\u003C/p\u003E",
+    "type": "",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "filePath": "",
+    "methodName": "",
+    "lineNumber": null,
+    "tags": [],
+    "createdAt": "2026-04-28T12:09:13.3715746Z"
+  },
+  {
+    "id": "f4206cc4-34e1-4985-aaa1-fc833ae5454d",
+    "title": "another name",
+    "description": "another name",
+    "type": "idea",
+    "createdBy": "Raj",
+    "attachment": "",
+    "filePath": "Program.cs",
+    "methodName": "test",
+    "lineNumber": 52,
+    "tags": [
+      "idea"
+    ],
+    "createdAt": "2026-04-28T12:09:32.4083751Z"
   }
 ]

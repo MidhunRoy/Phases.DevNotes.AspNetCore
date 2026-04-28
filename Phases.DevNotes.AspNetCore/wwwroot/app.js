@@ -2,6 +2,7 @@ const notesContainer = document.getElementById("notes");
 const noteForm = document.getElementById("note-form");
 const searchInput = document.getElementById("search");
 const typeFilterInput = document.getElementById("filter-type");
+const userFilterInput = document.getElementById("filter-user");
 const sortOrderInput = document.getElementById("sort-order");
 const statusElement = document.getElementById("status");
 const notesSummaryElement = document.getElementById("notes-summary");
@@ -11,7 +12,12 @@ const descriptionEditor = document.getElementById("description-editor");
 const titleInput = document.getElementById("title");
 const typeInput = document.getElementById("type");
 const tagsInput = document.getElementById("tags");
+const createdByInput = document.getElementById("created-by");
 const attachmentInput = document.getElementById("attachment");
+const codeFilePathInput = document.getElementById("code-file-path");
+const codeMethodNameInput = document.getElementById("code-method-name");
+const codeLineNumberInput = document.getElementById("code-line-number");
+const codeFilePathSuggestions = document.getElementById("code-file-path-suggestions");
 const themeToggleButton = document.getElementById("theme-toggle");
 const previousPageButton = document.getElementById("prev-page");
 const nextPageButton = document.getElementById("next-page");
@@ -24,9 +30,14 @@ const modalTitle = document.getElementById("modal-title");
 const modalDescription = document.getElementById("modal-description");
 const modalType = document.getElementById("modal-type");
 const modalTags = document.getElementById("modal-tags");
+const modalCreatedBy = document.getElementById("modal-created-by");
 const modalCreated = document.getElementById("modal-created");
 const modalAttachmentsSection = document.getElementById("modal-attachments-section");
 const modalAttachment = document.getElementById("modal-attachment");
+const modalCodeReferenceSection = document.getElementById("modal-code-reference-section");
+const modalCodeFile = document.getElementById("modal-code-file");
+const modalCodeMethod = document.getElementById("modal-code-method");
+const modalCodeLine = document.getElementById("modal-code-line");
 const composerModal = document.getElementById("composer-modal");
 const composerCloseButton = document.getElementById("composer-close-btn");
 const composerTitle = document.getElementById("composer-title");
@@ -38,11 +49,15 @@ const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const blockedDescriptionTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "IFRAME", "OBJECT", "EMBED", "META", "LINK", "BASE"]);
 const apiTimeoutMs = 10000;
 const searchDebounceMs = 300;
+const fileSuggestionDebounceMs = 180;
+const minFileSuggestionChars = 1;
+const createdByStorageKey = "devnotes_user_override";
+const defaultCreatedByFallback = "Unknown";
 
 let allNotes = [];
 let renderedNotes = [];
 let editingNoteId = null;
-let editingFilePath = "";
+let editingAttachment = "";
 let renderSignature = "";
 let activeFetchId = 0;
 let currentPage = 1;
@@ -52,10 +67,14 @@ let lastFocusedElement = null;
 let imageZoomOverlay = null;
 let statusResetTimer = 0;
 let notesFetchController = null;
+let fileSuggestionsFetchController = null;
+let lastFileSuggestionQuery = "";
 let notesSurfaceReady = false;
 let lastSummaryText = "";
 let lastPaginationKey = "";
 let lastComposerFocusedElement = null;
+let configDefaultCreatedBy = "";
+let createdByManuallyEdited = false;
 
 function getPreferredTheme() {
     const stored = localStorage.getItem(themeStorageKey);
@@ -162,6 +181,76 @@ async function apiRequest(url, options = {}) {
     }
 }
 
+function getSavedCreatedBy() {
+    return String(localStorage.getItem(createdByStorageKey) || "").trim();
+}
+
+function getConfigCreatedBy() {
+    return String(configDefaultCreatedBy || "").trim();
+}
+
+function resolveCreatedBy(inputValue = "") {
+    const explicitValue = String(inputValue || "").trim();
+    if (explicitValue) {
+        return explicitValue;
+    }
+
+    const configValue = getConfigCreatedBy();
+    if (configValue) {
+        return configValue;
+    }
+
+    const savedValue = getSavedCreatedBy();
+    if (savedValue) {
+        return savedValue;
+    }
+
+    return defaultCreatedByFallback;
+}
+
+function getCreatedBy() {
+    return resolveCreatedBy();
+}
+
+async function loadClientConfig() {
+    try {
+        const payload = await apiRequest("/devnotes/config");
+        configDefaultCreatedBy = String(payload?.defaultCreatedBy || "").trim();
+        if (createdByInput && !createdByManuallyEdited && configDefaultCreatedBy) {
+            createdByInput.value = configDefaultCreatedBy;
+        }
+    } catch {
+        configDefaultCreatedBy = "";
+    }
+}
+
+function getCreatedByForSubmit() {
+    const inputValue = String(createdByInput?.value || "").trim();
+    if (createdByManuallyEdited && inputValue) {
+        return inputValue;
+    }
+
+    return resolveCreatedBy(inputValue);
+}
+
+function getCreatedByForDisplay(value) {
+    const noteValue = String(value || "").trim();
+    if (noteValue) {
+        return noteValue;
+    }
+
+    return resolveCreatedBy();
+}
+
+function persistCreatedByOverride(rawValue) {
+    const overrideValue = String(rawValue || "").trim();
+    if (overrideValue) {
+        localStorage.setItem(createdByStorageKey, overrideValue);
+    } else {
+        localStorage.removeItem(createdByStorageKey);
+    }
+}
+
 function debounce(fn, delayMs) {
     let timerId = 0;
 
@@ -181,6 +270,9 @@ function setLoadingState(isLoading, { soft = false } = {}) {
     searchInput.disabled = isLoading && !soft;
     if (typeFilterInput) {
         typeFilterInput.disabled = isLoading && !soft;
+    }
+    if (userFilterInput) {
+        userFilterInput.disabled = isLoading && !soft;
     }
     if (sortOrderInput) {
         sortOrderInput.disabled = isLoading && !soft;
@@ -264,6 +356,7 @@ async function loadNotes(options = {}) {
             break;
         }
 
+        updateUserFilterOptions();
         renderSignature = "";
         renderNotes(true);
         updatePaginationUI();
@@ -312,6 +405,12 @@ noteForm.addEventListener("submit", async (event) => {
     const type = typeInput.value.trim();
     const rawTags = tagsInput.value.trim();
     const tags = rawTags ? rawTags.split(",").map((x) => x.trim()).filter(Boolean) : [];
+    const createdBy = getCreatedByForSubmit();
+    const codeFilePath = codeFilePathInput?.value.trim() || "";
+    const methodName = codeMethodNameInput?.value.trim() || "";
+    const lineNumberRaw = codeLineNumberInput?.value.trim() || "";
+    const parsedLineNumber = Number.parseInt(lineNumberRaw, 10);
+    const lineNumber = Number.isFinite(parsedLineNumber) && parsedLineNumber > 0 ? parsedLineNumber : null;
     const isEditing = Boolean(editingNoteId);
     const successMessage = isEditing ? "Note updated." : "Note added.";
 
@@ -320,7 +419,7 @@ noteForm.addEventListener("submit", async (event) => {
     setStatus(isEditing ? "Updating note..." : "Saving note...");
 
     try {
-        let filePath = isEditing ? editingFilePath : "";
+        let attachment = isEditing ? editingAttachment : "";
         const selectedFile = attachmentInput?.files?.[0] ?? null;
         if (selectedFile) {
             setStatus("Uploading attachment...");
@@ -332,10 +431,20 @@ noteForm.addEventListener("submit", async (event) => {
                 body: uploadData
             });
 
-            filePath = uploadResult?.filePath || uploadResult?.fileUrl || "";
+            attachment = uploadResult?.filePath || uploadResult?.fileUrl || "";
         }
 
-        const payload = { title, description, type, tags, filePath };
+        const payload = {
+            title,
+            description,
+            type,
+            tags,
+            createdBy,
+            attachment,
+            filePath: codeFilePath,
+            methodName,
+            lineNumber
+        };
         const endpoint = isEditing ? `/devnotes/${encodeURIComponent(editingNoteId)}` : "/devnotes/add";
         const method = isEditing ? "PUT" : "POST";
 
@@ -344,9 +453,12 @@ noteForm.addEventListener("submit", async (event) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
+        if (createdByManuallyEdited) {
+            persistCreatedByOverride(createdByInput?.value);
+        }
 
-        // Close immediately after a successful save, before async follow-up work.
-        resetFormState();
+        // Reinitialize the create form immediately so stale values never linger.
+        resetComposerAfterSave();
         closeComposerModal();
 
         try {
@@ -369,14 +481,41 @@ const debouncedSearch = debounce(() => {
     currentPage = 1;
     void loadNotes({ soft: true });
 }, searchDebounceMs);
+const debouncedFileSuggestions = debounce(() => {
+    void loadCodeFileSuggestions();
+}, fileSuggestionDebounceMs);
 
 searchInput.addEventListener("input", () => {
     debouncedSearch();
 });
 
+codeFilePathInput?.addEventListener("input", () => {
+    debouncedFileSuggestions();
+});
+
+codeFilePathInput?.addEventListener("focus", () => {
+    void loadCodeFileSuggestions();
+});
+
+createdByInput?.addEventListener("input", () => {
+    createdByManuallyEdited = true;
+    persistCreatedByOverride(createdByInput.value);
+});
+
+createdByInput?.addEventListener("blur", () => {
+    if (!createdByInput.value.trim()) {
+        createdByManuallyEdited = false;
+        createdByInput.value = resolveCreatedBy();
+    }
+});
+
 typeFilterInput?.addEventListener("change", () => {
     currentPage = 1;
     void loadNotes({ soft: true });
+});
+
+userFilterInput?.addEventListener("change", () => {
+    applyUserFilter(userFilterInput.value);
 });
 
 sortOrderInput?.addEventListener("change", () => {
@@ -425,12 +564,18 @@ descriptionEditor?.addEventListener("paste", (event) => {
 notesContainer.addEventListener("click", (event) => {
     const emptyStateAction = event.target.closest("[data-empty-action]");
     if (emptyStateAction instanceof HTMLElement && emptyStateAction.dataset.emptyAction === "create") {
-        resetFormState();
-        openComposerModal();
+        openComposerForCreate();
         return;
     }
 
     if (event.target.closest("a[data-attachment-link]")) {
+        return;
+    }
+    const codeReferenceLink = event.target.closest("a[data-code-reference-link]");
+    if (codeReferenceLink instanceof HTMLAnchorElement) {
+        if (codeReferenceLink.getAttribute("href") === "#") {
+            event.preventDefault();
+        }
         return;
     }
 
@@ -448,6 +593,14 @@ notesContainer.addEventListener("click", (event) => {
             void deleteNote(note);
         }
 
+        return;
+    }
+
+    const userFilterButton = event.target.closest("[data-user-filter]");
+    if (userFilterButton instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        applyUserFilter(userFilterButton.dataset.userFilter || "all");
         return;
     }
 
@@ -475,8 +628,7 @@ notesContainer.addEventListener("keydown", (event) => {
 
 if (cancelEditButton) {
     cancelEditButton.addEventListener("click", () => {
-        resetFormState();
-        openComposerModal();
+        openComposerForCreate();
         setStatus("Edit cancelled.");
     });
 }
@@ -498,9 +650,12 @@ document.addEventListener("keydown", (event) => {
 });
 
 addNoteButton?.addEventListener("click", () => {
-    resetFormState();
-    openComposerModal();
+    openComposerForCreate();
 });
+
+function openComposerForCreate() {
+    openComposerModal();
+}
 
 composerCloseButton?.addEventListener("click", () => {
     closeComposerModal();
@@ -565,9 +720,12 @@ function getRenderedNote(indexValue) {
 }
 
 function renderNotes(force = false) {
-    renderedNotes = allNotes;
+    const selectedUser = getSelectedUserFilterValue();
+    renderedNotes = selectedUser === "all"
+        ? allNotes
+        : allNotes.filter((note) => getCreatedByGroupName(note) === selectedUser);
 
-    const signature = `${currentPage}|${totalNotes}|${renderedNotes.length}|${renderedNotes.map((n) => `${getNoteId(n)}:${n.createdAt ?? ""}`).join("|")}`;
+    const signature = `${currentPage}|${totalNotes}|${selectedUser}|${renderedNotes.length}|${renderedNotes.map((n) => `${getNoteId(n)}:${n.createdAt ?? ""}:${getCreatedByGroupName(n)}`).join("|")}`;
     if (!force && signature === renderSignature) {
         return;
     }
@@ -576,7 +734,8 @@ function renderNotes(force = false) {
     if (renderedNotes.length === 0) {
         const hasSearch = Boolean(searchInput.value.trim());
         const hasTypeFilter = Boolean(typeFilterInput && typeFilterInput.value !== "all");
-        const isFirstNoteState = totalNotes === 0 && !hasSearch && !hasTypeFilter;
+        const hasUserFilter = Boolean(userFilterInput && userFilterInput.value !== "all");
+        const isFirstNoteState = totalNotes === 0 && !hasSearch && !hasTypeFilter && !hasUserFilter;
         if (isFirstNoteState) {
             notesContainer.innerHTML = `
                 <div class="notes-empty notes-empty-state">
@@ -590,58 +749,133 @@ function renderNotes(force = false) {
         return;
     }
 
-    notesContainer.innerHTML = renderedNotes
-        .map((note, index) => {
-            const safeTitle = escapeHtml(note.title || "Untitled");
-            const safeDescription = sanitizeDescriptionHtml(note.description || "");
-            const descriptionMarkup = safeDescription || "<p>No description.</p>";
-            const noteId = getNoteId(note);
-            const actionButtons = noteId
-                ? `
-                    <div class="note-actions">
-                        <button type="button" class="note-action-btn" data-note-action="edit" data-note-index="${index}" aria-label="Edit note ${safeTitle}">Edit</button>
-                        <button type="button" class="note-action-btn" data-note-action="delete" data-note-index="${index}" aria-label="Delete note ${safeTitle}">Delete</button>
-                    </div>
-                `
-                : "";
-            const safeType = note.type ? `<div class="meta meta--type">Type: ${escapeHtml(note.type)}</div>` : "";
-            const safeTags = Array.isArray(note.tags) && note.tags.length > 0
-                ? `<div class="meta meta--tags">Tags: ${escapeHtml(note.tags.join(", "))}</div>`
-                : "";
-            const attachmentMarkup = getAttachmentMarkup(note, "card");
-            const createdAt = note.createdAt
-                ? `<div class="meta meta--created">Created: ${new Date(note.createdAt).toLocaleString()}</div>`
-                : "";
-            const typeKey = String(note.type || "").trim().toLowerCase();
-            const noteTypeAttr = ["bug", "idea", "task"].includes(typeKey) ? ` data-note-type="${typeKey}"` : "";
-            const chipsInner = `${safeType}${safeTags}`;
-            const metaSection = chipsInner || createdAt
-                ? `<div class="note__meta">
-                        ${chipsInner ? `<div class="note__chips">${chipsInner}</div>` : ""}
-                        ${createdAt}
-                    </div>`
-                : "";
-            const footer = metaSection || actionButtons
-                ? `<div class="note__footer">
-                        ${metaSection}
-                        ${actionButtons}
-                    </div>`
-                : "";
+    const grouped = new Map();
+    renderedNotes.forEach((note, index) => {
+        const groupName = getCreatedByGroupName(note);
+        if (!grouped.has(groupName)) {
+            grouped.set(groupName, []);
+        }
 
+        grouped.get(groupName).push({ note, index });
+    });
+
+    notesContainer.innerHTML = Array.from(grouped.entries())
+        .map(([groupName, items]) => {
+            const countLabel = items.length === 1 ? "1 note" : `${items.length} notes`;
+            const notesMarkup = items.map((item) => renderNoteCard(item.note, item.index)).join("");
             return `
-                <article class="note"${noteTypeAttr} data-note-index="${index}" role="button" tabindex="0" aria-label="Open note ${safeTitle}">
-                    <div class="note__header">
-                        <h3 class="note-title">${safeTitle}</h3>
+                <section class="notes-group" data-created-by-group="${escapeHtml(groupName)}">
+                    <header class="notes-group__header">
+                        <h2 class="notes-group__title">${escapeHtml(groupName)}</h2>
+                        <span class="notes-group__count">${countLabel}</span>
+                    </header>
+                    <div class="notes-group__list">
+                        ${notesMarkup}
                     </div>
-                    <div class="note__body">
-                        <div class="note-description">${descriptionMarkup}</div>
-                        ${attachmentMarkup}
-                    </div>
-                    ${footer}
-                </article>
+                </section>
             `;
         })
         .join("");
+}
+
+function getCreatedByGroupName(note) {
+    const createdBy = String(note?.createdBy || "").trim();
+    return createdBy || defaultCreatedByFallback;
+}
+
+function getSelectedUserFilterValue() {
+    return String(userFilterInput?.value || "all");
+}
+
+function applyUserFilter(userValue) {
+    if (!userFilterInput) {
+        return;
+    }
+
+    const nextValue = String(userValue || "all");
+    userFilterInput.value = Array.from(userFilterInput.options).some((option) => option.value === nextValue)
+        ? nextValue
+        : "all";
+    renderSignature = "";
+    renderNotes(true);
+    updateNotesSummary();
+}
+
+function updateUserFilterOptions() {
+    if (!userFilterInput) {
+        return;
+    }
+
+    const previousValue = getSelectedUserFilterValue();
+    const uniqueUsers = Array.from(new Set(allNotes.map((note) => getCreatedByGroupName(note))))
+        .sort((a, b) => a.localeCompare(b));
+
+    userFilterInput.innerHTML = "";
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = "All users";
+    userFilterInput.append(allOption);
+
+    for (const user of uniqueUsers) {
+        const option = document.createElement("option");
+        option.value = user;
+        option.textContent = user;
+        userFilterInput.append(option);
+    }
+
+    userFilterInput.value = uniqueUsers.includes(previousValue) ? previousValue : "all";
+}
+
+function renderNoteCard(note, index) {
+    const safeTitle = escapeHtml(note.title || "Untitled");
+    const safeDescription = sanitizeDescriptionHtml(note.description || "");
+    const descriptionMarkup = safeDescription || "<p>No description.</p>";
+    const noteId = getNoteId(note);
+    const actionButtons = noteId
+        ? `
+            <div class="note-actions">
+                <button type="button" class="note-action-btn" data-note-action="edit" data-note-index="${index}" aria-label="Edit note ${safeTitle}">Edit</button>
+                <button type="button" class="note-action-btn" data-note-action="delete" data-note-index="${index}" aria-label="Delete note ${safeTitle}">Delete</button>
+            </div>
+        `
+        : "";
+    const safeType = note.type ? `<div class="meta meta--type">Type: ${escapeHtml(note.type)}</div>` : "";
+    const safeTags = Array.isArray(note.tags) && note.tags.length > 0
+        ? `<div class="meta meta--tags">Tags: ${escapeHtml(note.tags.join(", "))}</div>`
+        : "";
+    const attachmentMarkup = getAttachmentMarkup(note, "card");
+    const codeReferenceMarkup = getCodeReferenceMarkup(note);
+    const createdAt = note.createdAt
+        ? `<div class="meta meta--created">Created: ${new Date(note.createdAt).toLocaleString()}</div>`
+        : "";
+    const typeKey = String(note.type || "").trim().toLowerCase();
+    const noteTypeAttr = ["bug", "idea", "task"].includes(typeKey) ? ` data-note-type="${typeKey}"` : "";
+    const chipsInner = `${safeType}${safeTags}${codeReferenceMarkup}`;
+    const metaSection = chipsInner || createdAt
+        ? `<div class="note__meta">
+                ${chipsInner ? `<div class="note__chips">${chipsInner}</div>` : ""}
+                ${createdAt}
+            </div>`
+        : "";
+    const footer = metaSection || actionButtons
+        ? `<div class="note__footer">
+                ${metaSection}
+                ${actionButtons}
+            </div>`
+        : "";
+
+    return `
+        <article class="note"${noteTypeAttr} data-note-index="${index}" role="button" tabindex="0" aria-label="Open note ${safeTitle}">
+            <div class="note__header">
+                <h3 class="note-title">${safeTitle}</h3>
+            </div>
+            <div class="note__body">
+                <div class="note-description">${descriptionMarkup}</div>
+                ${attachmentMarkup}
+            </div>
+            ${footer}
+        </article>
+    `;
 }
 
 function updateNotesSummary() {
@@ -649,9 +883,20 @@ function updateNotesSummary() {
         return;
     }
 
-    const noteLabel = totalNotes === 1 ? "note" : "notes";
+    const visibleCount = renderedNotes.length;
     const sortLabel = (sortOrderInput?.value || "newest").toLowerCase() === "oldest" ? "Oldest" : "Newest";
-    const text = `${totalNotes} ${noteLabel} • Sorted by ${sortLabel}`;
+    const selectedUser = getSelectedUserFilterValue();
+    const segments = [
+        `${totalNotes} notes`,
+        `Showing ${visibleCount}`
+    ];
+
+    if (selectedUser !== "all") {
+        segments.push(`User: ${selectedUser}`);
+    }
+
+    segments.push(sortLabel);
+    const text = segments.join(" • ");
     if (text === lastSummaryText) {
         return;
     }
@@ -707,7 +952,20 @@ function startEditingNote(note) {
     }
     typeInput.value = note.type || "";
     tagsInput.value = Array.isArray(note.tags) ? note.tags.join(", ") : "";
-    editingFilePath = note.filePath || "";
+    if (createdByInput) {
+        createdByInput.value = getCreatedByForDisplay(note.createdBy);
+    }
+    createdByManuallyEdited = false;
+    if (codeFilePathInput) {
+        codeFilePathInput.value = note.filePath || "";
+    }
+    if (codeMethodNameInput) {
+        codeMethodNameInput.value = note.methodName || "";
+    }
+    if (codeLineNumberInput) {
+        codeLineNumberInput.value = note.lineNumber ? String(note.lineNumber) : "";
+    }
+    editingAttachment = note.attachment || "";
     if (attachmentInput) {
         attachmentInput.value = "";
     }
@@ -719,7 +977,7 @@ function startEditingNote(note) {
     cancelEditButton?.classList.remove("hidden");
     setStatus("Editing note.");
     closeModal();
-    openComposerModal();
+    openComposerModal({ preserveValues: true });
 }
 
 async function deleteNote(note) {
@@ -757,7 +1015,22 @@ function resetFormState() {
     }
 
     editingNoteId = null;
-    editingFilePath = "";
+    editingAttachment = "";
+    if (codeFilePathInput) {
+        codeFilePathInput.value = "";
+    }
+    if (createdByInput) {
+        createdByInput.value = getCreatedBy();
+    }
+    createdByManuallyEdited = false;
+    if (codeMethodNameInput) {
+        codeMethodNameInput.value = "";
+    }
+    if (codeLineNumberInput) {
+        codeLineNumberInput.value = "";
+    }
+    clearCodeFileSuggestions();
+    lastFileSuggestionQuery = "";
     submitButton.textContent = "Add Note";
     if (composerTitle) {
         composerTitle.textContent = "Add Note";
@@ -765,13 +1038,31 @@ function resetFormState() {
     cancelEditButton?.classList.add("hidden");
 }
 
+function resetComposerAfterSave() {
+    resetFormState();
+    if (createdByInput) {
+        createdByInput.value = getCreatedBy();
+    }
+    createdByManuallyEdited = false;
+}
+
 function isComposerModalOpen() {
     return composerModal && !composerModal.hidden;
 }
 
-function openComposerModal() {
+function openComposerModal(options = {}) {
     if (!composerModal) {
         return;
+    }
+
+    const preserveValues = Boolean(options.preserveValues);
+    if (!preserveValues) {
+        resetFormState();
+        if (createdByInput) {
+            // Always repopulate from source-of-truth on open; never reuse stale DOM value.
+            createdByInput.value = getCreatedBy();
+        }
+        createdByManuallyEdited = false;
     }
 
     if (isComposerModalOpen()) {
@@ -1010,24 +1301,37 @@ function isNoteModalOpen() {
 }
 
 function openModal(note) {
-    if (!noteModal || !modalTitle || !modalDescription || !modalType || !modalTags || !modalCreated || !modalAttachment) {
+    if (!noteModal || !modalTitle || !modalDescription || !modalType || !modalTags || !modalCreatedBy || !modalCreated || !modalAttachment) {
         return;
     }
 
     const title = note.title || "Untitled";
     const type = note.type || "N/A";
     const tags = Array.isArray(note.tags) && note.tags.length > 0 ? note.tags.join(", ") : "N/A";
+    const createdBy = getCreatedByForDisplay(note.createdBy);
     const createdAt = note.createdAt ? new Date(note.createdAt).toLocaleString() : "N/A";
 
     lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modalTitle.textContent = title;
     modalDescription.innerHTML = sanitizeDescriptionHtml(note.description) || "<p>No description.</p>";
-    modalAttachment.innerHTML = getAttachmentMarkup(note, "modal");
+    const codeReference = getCodeReferenceDetails(note);
+    const hasCodeReference = Boolean(codeReference.filePath || codeReference.methodName || codeReference.lineNumber);
+    if (modalCodeReferenceSection && modalCodeFile && modalCodeMethod && modalCodeLine) {
+        modalCodeReferenceSection.classList.toggle("hidden", !hasCodeReference);
+        modalCodeFile.innerHTML = codeReference.filePath ? `<strong>${escapeHtml(codeReference.filePath)}</strong>` : "";
+        modalCodeMethod.textContent = codeReference.methodName ? `Method: ${codeReference.methodName}` : "";
+        modalCodeLine.textContent = codeReference.lineNumber ? `Line: L${codeReference.lineNumber}` : "";
+    }
+
+    const hasAttachment = Boolean(getAttachmentPath(note));
+    const attachmentMarkup = hasAttachment ? getAttachmentMarkup(note, "modal") : "";
+    modalAttachment.innerHTML = attachmentMarkup;
     if (modalAttachmentsSection) {
-        modalAttachmentsSection.classList.toggle("hidden", !String(note.filePath || "").trim());
+        modalAttachmentsSection.classList.toggle("hidden", !hasAttachment);
     }
     modalType.textContent = `Type: ${type}`;
     modalTags.textContent = `Tags: ${tags}`;
+    modalCreatedBy.textContent = `Created by: ${createdBy}`;
     modalCreated.textContent = `Created: ${createdAt}`;
     const typeKey = type.trim().toLowerCase();
     for (const cls of ["type-bug", "type-idea", "type-task"]) {
@@ -1057,25 +1361,130 @@ function closeModal() {
 }
 
 function getAttachmentMarkup(note, view) {
-    const filePath = typeof note?.filePath === "string" ? note.filePath.trim() : "";
-    if (!filePath) {
+    const attachment = getAttachmentPath(note);
+    if (!attachment) {
         return "";
     }
 
-    if (isImageFile(filePath)) {
+    if (isImageFile(attachment)) {
         const imageClass = view === "modal" ? "modal-attachment-image" : "note-attachment-image";
         return `
             <div class="attachment-block attachment-block--image">
-                <img src="${escapeHtml(filePath)}" alt="Uploaded note image" class="${imageClass}" loading="lazy" />
+                <img src="${escapeHtml(attachment)}" alt="Uploaded note image" class="${imageClass}" loading="lazy" />
             </div>
         `;
     }
 
+    if (view === "card") {
+        return "";
+    }
+
     return `
         <div class="attachment-block attachment-block--file">
-            <a href="${escapeHtml(filePath)}" data-attachment-link target="_blank" rel="noopener noreferrer">Download attachment</a>
+            <a href="${escapeHtml(attachment)}" data-attachment-link target="_blank" rel="noopener noreferrer">Download attachment</a>
         </div>
     `;
+}
+
+function getAttachmentPath(note) {
+    const attachment = typeof note?.attachment === "string" ? note.attachment.trim() : "";
+    if (attachment) {
+        return attachment;
+    }
+
+    // Backward compatibility: legacy notes stored attachment path in filePath.
+    const filePath = String(note?.filePath || "").trim();
+    const hasCodeMethod = String(note?.methodName || "").trim().length > 0;
+    const lineNumberValue = Number(note?.lineNumber);
+    const hasCodeLine = Number.isInteger(lineNumberValue) && lineNumberValue > 0;
+    if (!hasCodeMethod && !hasCodeLine && isLikelyAttachmentPath(filePath)) {
+        return filePath;
+    }
+
+    return "";
+}
+
+function getCodeReferenceMarkup(note) {
+    const referenceLabel = formatCodeReference(note);
+    if (!referenceLabel) {
+        return "";
+    }
+
+    const href = getCodeReferenceLinkHref(note);
+    const targetAttributes = href !== "#"
+        ? ' target="_blank" rel="noopener noreferrer"'
+        : "";
+    return `<a class="meta meta--code-reference" data-code-reference-link href="${escapeHtml(href)}"${targetAttributes}>${escapeHtml(referenceLabel)}</a>`;
+}
+
+function formatCodeReference(note) {
+    const { filePath, methodName, lineNumber } = getCodeReferenceDetails(note);
+    const lineNumberValue = Number(lineNumber);
+    const hasLine = Number.isInteger(lineNumberValue) && lineNumberValue > 0;
+    if (!filePath && !methodName && !hasLine) {
+        return "";
+    }
+
+    let label = filePath || "Code reference";
+    if (methodName) {
+        label = `${label} \u2192 ${methodName}()`;
+    }
+    if (hasLine) {
+        label = `${label} (L${lineNumberValue})`;
+    }
+
+    return label;
+}
+
+function getCodeReferenceDetails(note) {
+    const rawFilePath = String(note?.filePath || "").trim();
+    const methodName = String(note?.methodName || "").trim();
+    const lineNumberValue = Number(note?.lineNumber);
+    const lineNumber = Number.isInteger(lineNumberValue) && lineNumberValue > 0
+        ? lineNumberValue
+        : null;
+    const attachmentPath = getAttachmentPath(note);
+    const filePath = attachmentPath && rawFilePath === attachmentPath ? "" : rawFilePath;
+
+    return { filePath, methodName, lineNumber };
+}
+
+function isLikelyAttachmentPath(path) {
+    const value = String(path || "").trim();
+    if (!value) {
+        return false;
+    }
+
+    const normalized = value.toLowerCase();
+    if (normalized.includes("/uploads/") || normalized.includes("\\uploads\\")) {
+        return true;
+    }
+
+    return normalized.endsWith(".png") ||
+        normalized.endsWith(".jpg") ||
+        normalized.endsWith(".jpeg") ||
+        normalized.endsWith(".gif") ||
+        normalized.endsWith(".webp") ||
+        normalized.endsWith(".pdf") ||
+        normalized.endsWith(".txt");
+}
+
+function getCodeReferenceLinkHref(note) {
+    const filePath = String(note?.filePath || "").trim();
+    if (!filePath) {
+        return "#";
+    }
+
+    try {
+        const parsed = new URL(filePath, window.location.origin);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+            return parsed.href;
+        }
+    } catch {
+        return "#";
+    }
+
+    return "#";
 }
 
 function isImageFile(path) {
@@ -1119,6 +1528,72 @@ function syncBodyScrollLock() {
     document.body.style.overflow = shouldLock ? "hidden" : "";
 }
 
+async function loadCodeFileSuggestions() {
+    if (!codeFilePathInput || !codeFilePathSuggestions) {
+        return;
+    }
+
+    const query = codeFilePathInput.value.trim();
+    if (query.length < minFileSuggestionChars) {
+        clearCodeFileSuggestions();
+        lastFileSuggestionQuery = "";
+        fileSuggestionsFetchController?.abort();
+        fileSuggestionsFetchController = null;
+        return;
+    }
+
+    if (query === lastFileSuggestionQuery) {
+        return;
+    }
+
+    fileSuggestionsFetchController?.abort();
+    const controller = new AbortController();
+    fileSuggestionsFetchController = controller;
+
+    try {
+        const payload = await apiRequest(`/devnotes/files?q=${encodeURIComponent(query)}`, {
+            signal: controller.signal
+        });
+        if (fileSuggestionsFetchController !== controller) {
+            return;
+        }
+
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        setCodeFileSuggestions(items);
+        lastFileSuggestionQuery = query;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+        }
+
+        clearCodeFileSuggestions();
+    } finally {
+        if (fileSuggestionsFetchController === controller) {
+            fileSuggestionsFetchController = null;
+        }
+    }
+}
+
+function setCodeFileSuggestions(items) {
+    if (!codeFilePathSuggestions) {
+        return;
+    }
+
+    codeFilePathSuggestions.innerHTML = "";
+    const uniqueItems = Array.from(new Set((items || []).map((item) => String(item || "").trim()).filter(Boolean)));
+    for (const item of uniqueItems) {
+        const option = document.createElement("option");
+        option.value = item;
+        codeFilePathSuggestions.append(option);
+    }
+}
+
+function clearCodeFileSuggestions() {
+    if (codeFilePathSuggestions) {
+        codeFilePathSuggestions.innerHTML = "";
+    }
+}
+
 function setStatus(message, isError = false, isSuccess = false) {
     if (statusResetTimer) {
         window.clearTimeout(statusResetTimer);
@@ -1147,4 +1622,5 @@ if (noteModal) {
 }
 closeComposerModal();
 closeModal();
+void loadClientConfig();
 loadNotes();

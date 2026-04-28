@@ -24,13 +24,24 @@ namespace Phases.DevNotes.AspNetCore.Extensions
 
             var env = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
             var options = app.ApplicationServices.GetRequiredService<IOptions<DevNotesOptions>>().Value;
-            if (!env.IsDevelopment() && !options.EnableInNonDevelopment)
+            var requestPath = new PathString(options.RoutePrefix);
+            if (!env.IsDevelopment() || !options.Enabled)
             {
+                app.Use(async (context, next) =>
+                {
+                    if (context.Request.Path.StartsWithSegments(requestPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status404NotFound;
+                        return;
+                    }
+
+                    await next();
+                });
+
                 return app;
             }
 
             var embeddedFiles = new ManifestEmbeddedFileProvider(typeof(ApplicationBuilderExtensions).Assembly, "wwwroot");
-            var requestPath = new PathString(options.RoutePrefix);
             var uploadsFolder = Path.Combine(env.ContentRootPath, options.DataFolderName, options.UploadsFolderName);
             Directory.CreateDirectory(uploadsFolder);
 

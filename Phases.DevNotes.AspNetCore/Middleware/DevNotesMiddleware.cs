@@ -6,6 +6,7 @@ using Phases.DevNotes.AspNetCore.Models;
 using Phases.DevNotes.AspNetCore.Options;
 using Phases.DevNotes.AspNetCore.Services;
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Phases.DevNotes.AspNetCore.Middleware
@@ -16,7 +17,25 @@ namespace Phases.DevNotes.AspNetCore.Middleware
         private readonly IHostEnvironment _hostEnvironment;
         private readonly string _routePrefix;
         private readonly string _uploadsFolder;
+        private readonly string _defaultCreatedBy;
+        private const string UnknownCreatedBy = "Unknown";
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly HashSet<string> IgnoredDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "bin",
+            "obj",
+            ".git",
+            ".vs",
+            "node_modules",
+            ".devnotes"
+        };
+        private static readonly HashSet<string> AllowedSuggestionExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".cs", ".csproj", ".sln", ".slnx", ".cshtml", ".razor",
+            ".js", ".ts", ".tsx", ".css", ".html",
+            ".json", ".xml", ".config", ".md", ".txt",
+            ".sql", ".yml", ".yaml", ".props", ".targets"
+        };
 
         public DevNotesMiddleware(RequestDelegate next, IHostEnvironment hostEnvironment, IOptions<DevNotesOptions> optionsAccessor)
         {
@@ -28,6 +47,7 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             var dataFolder = string.IsNullOrWhiteSpace(options.DataFolderName) ? ".devnotes" : options.DataFolderName.Trim();
             var uploadsFolderName = string.IsNullOrWhiteSpace(options.UploadsFolderName) ? "uploads" : options.UploadsFolderName.Trim();
             _uploadsFolder = Path.Combine(_hostEnvironment.ContentRootPath, dataFolder, uploadsFolderName);
+            _defaultCreatedBy = ResolveDefaultCreatedBy(options.DefaultCreatedBy);
         }
 
         public async Task Invoke(HttpContext context, IDevNotesService service)
@@ -70,6 +90,11 @@ namespace Phases.DevNotes.AspNetCore.Middleware
                         return;
                     }
 
+                    if (string.IsNullOrWhiteSpace(note.CreatedBy))
+                    {
+                        note.CreatedBy = _defaultCreatedBy;
+                    }
+
                     service.Add(note);
                     await WriteJsonAsync(context, StatusCodes.Status200OK, new { message = "Note added successfully.", note });
                     return;
@@ -78,6 +103,20 @@ namespace Phases.DevNotes.AspNetCore.Middleware
                 if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path == $"{_routePrefix}/upload")
                 {
                     await HandleUploadAsync(context);
+                    return;
+                }
+
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/config")
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status200OK, new { defaultCreatedBy = _defaultCreatedBy });
+                    return;
+                }
+
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/files")
+                {
+                    var query = context.Request.Query["q"].ToString();
+                    var suggestions = GetFileSuggestions(query);
+                    await WriteJsonAsync(context, StatusCodes.Status200OK, new { items = suggestions });
                     return;
                 }
 
@@ -184,6 +223,108 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             return false;
         }
 
+        private IReadOnlyList<string> GetFileSuggestions(string? query)
+        {
+            const int maxDepth = 3;
+            const int maxScannedFiles = 1200;
+            const int maxResults = 20;
+
+            var term = (query ?? string.Empty).Trim();
+            if (term.Length < 1)
+            {
+                return Array.Empty<string>();
+            }
+
+            var root = _hostEnvironment.ContentRootPath;
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            {
+                return Array.Empty<string>();
+            }
+
+            var matches = new List<string>(maxResults);
+            var stack = new Stack<(string Path, int Depth)>();
+            stack.Push((root, 0));
+            var scannedFiles = 0;
+
+            while (stack.Count > 0 && scannedFiles < maxScannedFiles && matches.Count < maxResults)
+            {
+                var (directory, depth) = stack.Pop();
+
+                IEnumerable<string> files;
+                try
+                {
+                    files = Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var file in files)
+                {
+                    scannedFiles++;
+                    if (scannedFiles > maxScannedFiles)
+                    {
+                        break;
+                    }
+
+                    var extension = Path.GetExtension(file);
+                    if (!AllowedSuggestionExtensions.Contains(extension))
+                    {
+                        continue;
+                    }
+
+                    var relativePath = Path.GetRelativePath(root, file).Replace('\\', '/');
+                    if (relativePath.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    {
+                        matches.Add(relativePath);
+                        if (matches.Count >= maxResults)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (depth >= maxDepth || matches.Count >= maxResults || scannedFiles >= maxScannedFiles)
+                {
+                    continue;
+                }
+
+                IEnumerable<string> directories;
+                try
+                {
+                    directories = Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var child in directories)
+                {
+                    if (ShouldSkipDirectory(child))
+                    {
+                        continue;
+                    }
+
+                    stack.Push((child, depth + 1));
+                }
+            }
+
+            return matches
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path.Length)
+                .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Take(maxResults)
+                .ToList();
+        }
+
+        private static bool ShouldSkipDirectory(string path)
+        {
+            var name = Path.GetFileName(path);
+            return string.IsNullOrWhiteSpace(name) || IgnoredDirectoryNames.Contains(name);
+        }
+
         private bool TryGetNoteId(PathString path, out Guid noteId)
         {
             noteId = default;
@@ -281,6 +422,81 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             }
 
             return value.Length > 1 ? value.TrimEnd('/') : value;
+        }
+
+        private static string ResolveDefaultCreatedBy(string? configuredDefault)
+        {
+            var configured = configuredDefault?.Trim();
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return configured;
+            }
+
+            var gitName = ReadGitConfigValue("user.name");
+            var gitEmail = ReadGitConfigValue("user.email");
+
+            if (!string.IsNullOrWhiteSpace(gitName) && !string.IsNullOrWhiteSpace(gitEmail))
+            {
+                return $"{gitName} <{gitEmail}>";
+            }
+
+            if (!string.IsNullOrWhiteSpace(gitName))
+            {
+                return gitName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(gitEmail))
+            {
+                return gitEmail;
+            }
+
+            return UnknownCreatedBy;
+        }
+
+        private static string ReadGitConfigValue(string key)
+        {
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = $"config {key}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(startInfo);
+                if (process is null)
+                {
+                    return string.Empty;
+                }
+
+                if (!process.WaitForExit(1500))
+                {
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch
+                    {
+                    }
+
+                    return string.Empty;
+                }
+
+                if (process.ExitCode != 0)
+                {
+                    return string.Empty;
+                }
+
+                return (process.StandardOutput.ReadToEnd() ?? string.Empty).Trim();
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static async Task WriteJsonAsync(HttpContext context, int statusCode, object payload)

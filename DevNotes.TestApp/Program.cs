@@ -2,7 +2,11 @@ using Phases.DevNotes.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDevNotes();
+builder.Services.AddDevNotes(options =>
+{
+    // Optional config override: set DevNotes:Enabled=false to disable dashboard.
+    options.Enabled = builder.Configuration.GetValue<bool?>("DevNotes:Enabled") ?? true;
+});
 
 // Add services to the container.
 builder.Services.AddRazorPages();

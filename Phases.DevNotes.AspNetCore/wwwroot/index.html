@@ -13,13 +13,17 @@
     <main class="container dashboard">
         <section class="panel notes-panel">
             <header class="notes-header">
-                <div class="notes-header__title">
-                    <h1 class="app-title">Dev Notes</h1>
-                    <p class="subtitle">Capture quick development notes while building.</p>
+                <div class="notes-row notes-row--primary">
+                    <div class="notes-header__title">
+                        <h1 class="app-title">Dev Notes</h1>
+                        <p class="subtitle">Capture quick development notes while building.</p>
+                    </div>
+                    <div class="notes-row__actions">
+                        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">Dark mode</button>
+                        <button id="add-note-btn" class="add-note-btn" type="button">Add Note</button>
+                    </div>
                 </div>
-                <div class="notes-actions">
-                    <button id="add-note-btn" class="add-note-btn" type="button">Add Note</button>
-                    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">Dark mode</button>
+                <div class="notes-row notes-row--filters">
                     <input id="search" type="search" placeholder="Search title, description, tags..." aria-label="Search notes" autocomplete="off" />
                     <select id="filter-type" aria-label="Filter notes by type">
                         <option value="all">All types</option>
@@ -27,14 +31,19 @@
                         <option value="idea">Idea</option>
                         <option value="task">Task</option>
                     </select>
+                    <select id="filter-user" aria-label="Filter notes by user">
+                        <option value="all">All users</option>
+                    </select>
                     <select id="sort-order" aria-label="Sort notes">
                         <option value="newest">Newest first</option>
                         <option value="oldest">Oldest first</option>
                     </select>
                 </div>
+                <div class="notes-row notes-row--summary">
+                    <div id="notes-summary" class="notes-summary" aria-live="polite"></div>
+                </div>
             </header>
             <div id="status" class="status" aria-live="polite" role="status"></div>
-            <div id="notes-summary" class="notes-summary" aria-live="polite"></div>
             <div id="notes" class="notes" aria-live="polite"></div>
             <footer class="pagination" aria-label="Notes pagination">
                 <button id="prev-page" type="button" aria-label="Previous page">Previous</button>
@@ -63,7 +72,17 @@
                 <div class="modal-meta-items">
                     <div id="modal-type" class="meta meta--type"></div>
                     <div id="modal-tags" class="meta meta--tags"></div>
+                    <div id="modal-created-by" class="meta meta--created-by"></div>
                     <div id="modal-created" class="meta meta--created"></div>
+                </div>
+            </section>
+
+            <section id="modal-code-reference-section" class="modal-section modal-section--code-reference hidden">
+                <h4 class="modal-section-title">Code Reference</h4>
+                <div id="modal-code-reference" class="modal-code-reference">
+                    <div id="modal-code-file" class="modal-code-reference__file"></div>
+                    <div id="modal-code-method" class="modal-code-reference__item"></div>
+                    <div id="modal-code-line" class="modal-code-reference__item"></div>
                 </div>
             </section>
 
@@ -108,8 +127,21 @@
                 <label for="tags">Tags</label>
                 <input id="tags" name="tags" type="text" placeholder="api, auth, perf" />
 
+                <label for="created-by">Created by (optional)</label>
+                <input id="created-by" name="createdBy" type="text" placeholder="Your name" autocomplete="name" />
+
                 <label for="attachment">Attachment (optional)</label>
                 <input id="attachment" name="attachment" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" />
+
+                <label for="code-file-path">Code file path (optional)</label>
+                <input id="code-file-path" name="codeFilePath" type="text" list="code-file-path-suggestions" placeholder="Program.cs or /src/Program.cs" />
+                <datalist id="code-file-path-suggestions"></datalist>
+
+                <label for="code-method-name">Method name (optional)</label>
+                <input id="code-method-name" name="codeMethodName" type="text" placeholder="ConfigureServices" />
+
+                <label for="code-line-number">Line number (optional)</label>
+                <input id="code-line-number" name="codeLineNumber" type="number" min="1" step="1" placeholder="42" />
 
                 <div class="form-actions">
                     <button id="submit-btn" type="submit">Add Note</button>

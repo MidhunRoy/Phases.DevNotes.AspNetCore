@@ -8,6 +8,7 @@ namespace Phases.DevNotes.AspNetCore.Services
 {
     internal class DevNotesService : IDevNotesService
     {
+        private const string UnknownCreatedBy = "Unknown";
         private readonly JsonStorageProvider<DevNote> _storage;
         private readonly object _sync = new();
 
@@ -64,7 +65,11 @@ namespace Phases.DevNotes.AspNetCore.Services
             note.Title = note.Title?.Trim() ?? string.Empty;
             note.Description = note.Description?.Trim() ?? string.Empty;
             note.Type = note.Type?.Trim() ?? string.Empty;
+            note.CreatedBy = NormalizeCreatedBy(note.CreatedBy);
+            note.Attachment = note.Attachment?.Trim() ?? string.Empty;
             note.FilePath = note.FilePath?.Trim() ?? string.Empty;
+            note.MethodName = note.MethodName?.Trim() ?? string.Empty;
+            note.LineNumber = note.LineNumber is > 0 ? note.LineNumber : null;
             note.Tags = note.Tags?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList() ?? new List<string>();
             if (note.CreatedAt == default)
             {
@@ -89,7 +94,11 @@ namespace Phases.DevNotes.AspNetCore.Services
             updatedNote.Title = updatedNote.Title?.Trim() ?? string.Empty;
             updatedNote.Description = updatedNote.Description?.Trim() ?? string.Empty;
             updatedNote.Type = updatedNote.Type?.Trim() ?? string.Empty;
+            updatedNote.CreatedBy = NormalizeCreatedBy(updatedNote.CreatedBy);
+            updatedNote.Attachment = updatedNote.Attachment?.Trim() ?? string.Empty;
             updatedNote.FilePath = updatedNote.FilePath?.Trim() ?? string.Empty;
+            updatedNote.MethodName = updatedNote.MethodName?.Trim() ?? string.Empty;
+            updatedNote.LineNumber = updatedNote.LineNumber is > 0 ? updatedNote.LineNumber : null;
             updatedNote.Tags = updatedNote.Tags?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList() ?? new List<string>();
 
             lock (_sync)
@@ -104,11 +113,21 @@ namespace Phases.DevNotes.AspNetCore.Services
                 existing.Title = updatedNote.Title;
                 existing.Description = updatedNote.Description;
                 existing.Type = updatedNote.Type;
+                existing.CreatedBy = updatedNote.CreatedBy;
+                existing.Attachment = updatedNote.Attachment;
                 existing.FilePath = updatedNote.FilePath;
+                existing.MethodName = updatedNote.MethodName;
+                existing.LineNumber = updatedNote.LineNumber;
                 existing.Tags = updatedNote.Tags;
                 _storage.Save(notes);
                 return existing;
             }
+        }
+
+        private static string NormalizeCreatedBy(string? createdBy)
+        {
+            var value = createdBy?.Trim();
+            return string.IsNullOrWhiteSpace(value) ? UnknownCreatedBy : value;
         }
 
         public bool Delete(Guid id)
