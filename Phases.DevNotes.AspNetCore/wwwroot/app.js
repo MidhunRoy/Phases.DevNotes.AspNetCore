@@ -23,6 +23,7 @@ const previousPageButton = document.getElementById("prev-page");
 const nextPageButton = document.getElementById("next-page");
 const pageIndicator = document.getElementById("page-indicator");
 const addNoteButton = document.getElementById("add-note-btn");
+const quickAddNoteFab = document.getElementById("quick-add-note-fab");
 const noteModal = document.getElementById("note-modal");
 const noteModalContent = noteModal?.querySelector("[data-modal-content]") ?? null;
 const modalCloseButton = document.getElementById("modal-close");
@@ -41,6 +42,7 @@ const modalCodeLine = document.getElementById("modal-code-line");
 const composerModal = document.getElementById("composer-modal");
 const composerCloseButton = document.getElementById("composer-close-btn");
 const composerTitle = document.getElementById("composer-title");
+const fabRevealScrollY = 200;
 
 const themeStorageKey = "dev-notes-theme";
 const darkTheme = "dark";
@@ -361,7 +363,7 @@ async function loadNotes(options = {}) {
         renderNotes(true);
         updatePaginationUI();
         updateNotesSummary();
-        setStatus(`${allNotes.length} note(s) loaded.`);
+        setStatus("");
         notesSurfaceReady = true;
     } catch (error) {
         if (fetchId !== activeFetchId) {
@@ -634,6 +636,13 @@ if (cancelEditButton) {
 }
 
 document.addEventListener("keydown", (event) => {
+    const isQuickCreateShortcut = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "n";
+    if (isQuickCreateShortcut && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        openComposerForCreate();
+        return;
+    }
+
     if (event.key === "Escape" && imageZoomOverlay) {
         closeImageZoom();
         return;
@@ -649,12 +658,41 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
+function isTypingTarget(target) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    return target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.closest("[contenteditable='true']") !== null ||
+        target.isContentEditable;
+}
+
 addNoteButton?.addEventListener("click", () => {
     openComposerForCreate();
 });
 
+quickAddNoteFab?.addEventListener("click", () => {
+    openComposerForCreate();
+});
+
+window.addEventListener("scroll", () => {
+    syncQuickAddFabVisibility();
+}, { passive: true });
+
 function openComposerForCreate() {
     openComposerModal();
+}
+
+function syncQuickAddFabVisibility() {
+    if (!quickAddNoteFab) {
+        return;
+    }
+
+    const shouldShow = window.scrollY > fabRevealScrollY;
+    quickAddNoteFab.classList.toggle("quick-add-note-fab--visible", shouldShow);
 }
 
 composerCloseButton?.addEventListener("click", () => {
@@ -739,8 +777,8 @@ function renderNotes(force = false) {
         if (isFirstNoteState) {
             notesContainer.innerHTML = `
                 <div class="notes-empty notes-empty-state">
-                    <p>No notes yet. Start by creating your first note.</p>
-                    <button type="button" class="empty-state-action" data-empty-action="create">Create first note</button>
+                    <p>No notes yet</p>
+                    <button type="button" class="empty-state-action" data-empty-action="create">Add your first note</button>
                 </div>
             `;
         } else {
@@ -892,7 +930,7 @@ function updateNotesSummary() {
     ];
 
     if (selectedUser !== "all") {
-        segments.push(`User: ${selectedUser}`);
+        segments.push(selectedUser);
     }
 
     segments.push(sortLabel);
