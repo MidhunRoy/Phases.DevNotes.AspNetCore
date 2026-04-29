@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Phases.DevNotes.AspNetCore.Options;
 using System.Text.Json;
 
 namespace Phases.DevNotes.AspNetCore.Storage
@@ -15,15 +17,32 @@ namespace Phases.DevNotes.AspNetCore.Storage
             AllowTrailingCommas = true
         };
 
-        public JsonStorageProvider(IHostEnvironment env)
+        public JsonStorageProvider(IHostEnvironment env, IOptions<DevNotesOptions> options)
         {
-            var folder = Path.Combine(env.ContentRootPath, ".devnotes");
-            Directory.CreateDirectory(folder);
-
-            _filePath = Path.Combine(folder, "devnotes.json");
-            if (!File.Exists(_filePath))
+            var folderName = string.IsNullOrWhiteSpace(options.Value.DataFolderName) ? ".devnotes" : options.Value.DataFolderName.Trim();
+            var fallbackFolder = Path.Combine(env.ContentRootPath, ".devnotes");
+            var selectedFolder = fallbackFolder;
+            try
             {
-                File.WriteAllText(_filePath, "[]");
+                var configuredFolder = Path.Combine(env.ContentRootPath, folderName);
+                Directory.CreateDirectory(configuredFolder);
+                selectedFolder = configuredFolder;
+            }
+            catch
+            {
+                Directory.CreateDirectory(fallbackFolder);
+            }
+
+            _filePath = Path.Combine(selectedFolder, "devnotes.json");
+            try
+            {
+                if (!File.Exists(_filePath))
+                {
+                    File.WriteAllText(_filePath, "[]");
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -55,21 +74,35 @@ namespace Phases.DevNotes.AspNetCore.Storage
         public void Save(List<T> notes)
         {
             var data = notes ?? new List<T>();
-            var json = JsonSerializer.Serialize(data, JsonOptions);
+            string json;
+            try
+            {
+                json = JsonSerializer.Serialize(data, JsonOptions);
+            }
+            catch
+            {
+                return;
+            }
 
             lock (_sync)
             {
-                var tempPath = _filePath + ".tmp";
-                File.WriteAllText(tempPath, json);
+                try
+                {
+                    var tempPath = _filePath + ".tmp";
+                    File.WriteAllText(tempPath, json);
 
-                if (File.Exists(_filePath))
-                {
-                    File.Copy(tempPath, _filePath, overwrite: true);
-                    File.Delete(tempPath);
+                    if (File.Exists(_filePath))
+                    {
+                        File.Copy(tempPath, _filePath, overwrite: true);
+                        File.Delete(tempPath);
+                    }
+                    else
+                    {
+                        File.Move(tempPath, _filePath);
+                    }
                 }
-                else
+                catch
                 {
-                    File.Move(tempPath, _filePath);
                 }
             }
         }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Phases.DevNotes.AspNetCore.FileProviders;
 using Phases.DevNotes.AspNetCore.Models;
 using Phases.DevNotes.AspNetCore.Options;
 using Phases.DevNotes.AspNetCore.Services;
@@ -22,11 +23,13 @@ namespace Phases.DevNotes.AspNetCore.Extensions
             services.PostConfigure<DevNotesOptions>(options =>
             {
                 options.RoutePrefix = NormalizeRoutePrefix(options.RoutePrefix);
+                options.SafeUiPath = NormalizeSafeUiPath(options.SafeUiPath);
                 options.DataFolderName = string.IsNullOrWhiteSpace(options.DataFolderName) ? ".devnotes" : options.DataFolderName.Trim();
                 options.UploadsFolderName = string.IsNullOrWhiteSpace(options.UploadsFolderName) ? "uploads" : options.UploadsFolderName.Trim();
                 options.DefaultCreatedBy = options.DefaultCreatedBy?.Trim() ?? string.Empty;
             });
 
+            services.TryAddSingleton<DevNotesEmbeddedAssets>();
             services.TryAddSingleton<JsonStorageProvider<DevNote>>();
             services.TryAddScoped<IDevNotesService, DevNotesService>();
 
@@ -36,6 +39,17 @@ namespace Phases.DevNotes.AspNetCore.Extensions
         private static string NormalizeRoutePrefix(string? routePrefix)
         {
             var value = string.IsNullOrWhiteSpace(routePrefix) ? "/devnotes" : routePrefix.Trim();
+            if (!value.StartsWith('/'))
+            {
+                value = "/" + value;
+            }
+
+            return value.Length > 1 ? value.TrimEnd('/') : value;
+        }
+
+        private static string NormalizeSafeUiPath(string? safeUiPath)
+        {
+            var value = string.IsNullOrWhiteSpace(safeUiPath) ? "/devnotes-safe" : safeUiPath.Trim();
             if (!value.StartsWith('/'))
             {
                 value = "/" + value;

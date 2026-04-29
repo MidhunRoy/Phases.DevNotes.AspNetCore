@@ -18,7 +18,7 @@ namespace Phases.DevNotes.AspNetCore.Services
         }
 
         public List<DevNote> GetAll()
-        {
+        {           
             lock (_sync)
             {
                 return _storage.GetAll();

@@ -158,16 +158,23 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             }
             catch (JsonException)
             {
-                await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid JSON payload." });
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid JSON payload." });
                 return;
             }
             catch (Exception)
             {
-                await WriteJsonAsync(context, StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred." });
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred." });
                 return;
             }
 
-            await _next(context);
+            try
+            {
+                await _next(context);
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "DevNotes route failed." });
+            }
         }
 
         private async Task HandleUploadAsync(HttpContext context)
@@ -504,6 +511,30 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/json; charset=utf-8";
             await JsonSerializer.SerializeAsync(context.Response.Body, payload, JsonOptions, context.RequestAborted);
+        }
+
+        private static async Task TryWriteJsonSafeAsync(HttpContext context, int statusCode, object payload)
+        {
+            if (context.Response.HasStarted)
+            {
+                return;
+            }
+
+            try
+            {
+                await WriteJsonAsync(context, statusCode, payload);
+            }
+            catch
+            {
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.Response.StatusCode = statusCode;
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                await context.Response.WriteAsync("DevNotes unavailable.", context.RequestAborted);
+            }
         }
     }
 }

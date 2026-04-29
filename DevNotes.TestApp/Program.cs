@@ -11,15 +11,17 @@ builder.Services.AddDevNotes(options =>
 // Add services to the container.
 builder.Services.AddRazorPages();
 
+
 var app = builder.Build();
+
+// DevNotes runs first so the dashboard and lightweight API stay available even when later middleware fails.
+app.UseDevNotes();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
 }
-
-app.UseDevNotes();
 
 app.UseStaticFiles();
 

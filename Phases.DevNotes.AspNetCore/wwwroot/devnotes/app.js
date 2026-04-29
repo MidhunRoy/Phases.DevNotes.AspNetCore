@@ -729,6 +729,14 @@ noteModalContent?.addEventListener("click", (event) => {
     event.stopPropagation();
 });
 
+window.addEventListener("unhandledrejection", () => {
+    setStatus("A background request failed. Please try again.", true);
+});
+
+window.addEventListener("error", () => {
+    setStatus("DevNotes UI recovered from an unexpected error.", true);
+});
+
 modalAttachment?.addEventListener("click", (event) => {
     const imageElement = event.target.closest(".modal-attachment-image");
     if (!(imageElement instanceof HTMLImageElement)) {
