@@ -131,8 +131,9 @@
                 <label for="created-by">Created by (optional)</label>
                 <input id="created-by" name="createdBy" type="text" placeholder="Your name" autocomplete="name" />
 
-                <label for="attachment">Attachment (optional)</label>
-                <input id="attachment" name="attachment" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" />
+                <label for="attachment">Attachments (optional)</label>
+                <input id="attachment" name="attachment" type="file" multiple accept=".png,.jpg,.jpeg,.pdf,.txt,image/png,image/jpeg,application/pdf,text/plain" />
+                <p class="field-hint">Select several files in one dialog (Ctrl+click), or choose again to add more. Duplicates are skipped.</p>
 
                 <label for="code-file-path">Code file path (optional)</label>
                 <input id="code-file-path" name="codeFilePath" type="text" list="code-file-path-suggestions" placeholder="Program.cs or /src/Program.cs" />

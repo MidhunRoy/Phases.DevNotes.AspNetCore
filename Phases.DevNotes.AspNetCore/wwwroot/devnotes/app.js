@@ -59,7 +59,9 @@ const defaultCreatedByFallback = "Unknown";
 let allNotes = [];
 let renderedNotes = [];
 let editingNoteId = null;
-let editingAttachment = "";
+let editingAttachments = [];
+/** @type {File[]} Accumulated files for the composer; file input replaces each pick unless we merge here. */
+let composerPendingFiles = [];
 let renderSignature = "";
 let activeFetchId = 0;
 let currentPage = 1;
@@ -67,6 +69,8 @@ const pageSize = 10;
 let totalNotes = 0;
 let lastFocusedElement = null;
 let imageZoomOverlay = null;
+let imageLightboxReturnFocus = null;
+let imageZoomCloseTimerId = 0;
 let statusResetTimer = 0;
 let notesFetchController = null;
 let fileSuggestionsFetchController = null;
@@ -421,19 +425,27 @@ noteForm.addEventListener("submit", async (event) => {
     setStatus(isEditing ? "Updating note..." : "Saving note...");
 
     try {
-        let attachment = isEditing ? editingAttachment : "";
-        const selectedFile = attachmentInput?.files?.[0] ?? null;
-        if (selectedFile) {
-            setStatus("Uploading attachment...");
-            const uploadData = new FormData();
-            uploadData.append("file", selectedFile);
+        const attachments = isEditing ? editingAttachments.slice() : [];
+        const selectedFiles = composerPendingFiles.length > 0
+            ? composerPendingFiles.slice()
+            : (attachmentInput?.files?.length ? Array.from(attachmentInput.files) : []);
+        if (selectedFiles.length > 0) {
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const n = selectedFiles.length;
+                setStatus(n > 1 ? `Uploading attachment ${i + 1} of ${n}...` : "Uploading attachment...");
+                const uploadData = new FormData();
+                uploadData.append("file", selectedFiles[i]);
 
-            const uploadResult = await apiRequest("/devnotes/upload", {
-                method: "POST",
-                body: uploadData
-            });
+                const uploadResult = await apiRequest("/devnotes/upload", {
+                    method: "POST",
+                    body: uploadData
+                });
 
-            attachment = uploadResult?.filePath || uploadResult?.fileUrl || "";
+                const path = uploadResult?.filePath || uploadResult?.fileUrl || "";
+                if (path) {
+                    attachments.push(path);
+                }
+            }
         }
 
         const payload = {
@@ -442,7 +454,8 @@ noteForm.addEventListener("submit", async (event) => {
             type,
             tags,
             createdBy,
-            attachment,
+            attachments,
+            attachment: attachments.length > 0 ? attachments[0] : "",
             filePath: codeFilePath,
             methodName,
             lineNumber
@@ -726,6 +739,25 @@ noteModal?.addEventListener("click", (event) => {
 });
 
 noteModalContent?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target instanceof Element) {
+        const attachmentImage = target.closest(".modal-attachment-image");
+        if (attachmentImage instanceof HTMLImageElement) {
+            event.preventDefault();
+            openImageZoom(attachmentImage.currentSrc || attachmentImage.src);
+            event.stopPropagation();
+            return;
+        }
+
+        const descriptionImage = target.closest(".modal-description img");
+        if (descriptionImage instanceof HTMLImageElement) {
+            event.preventDefault();
+            openImageZoom(descriptionImage.currentSrc || descriptionImage.src);
+            event.stopPropagation();
+            return;
+        }
+    }
+
     event.stopPropagation();
 });
 
@@ -735,15 +767,6 @@ window.addEventListener("unhandledrejection", () => {
 
 window.addEventListener("error", () => {
     setStatus("DevNotes UI recovered from an unexpected error.", true);
-});
-
-modalAttachment?.addEventListener("click", (event) => {
-    const imageElement = event.target.closest(".modal-attachment-image");
-    if (!(imageElement instanceof HTMLImageElement)) {
-        return;
-    }
-
-    openImageZoom(imageElement.src);
 });
 
 noteForm.addEventListener("keydown", (event) => {
@@ -1011,10 +1034,8 @@ function startEditingNote(note) {
     if (codeLineNumberInput) {
         codeLineNumberInput.value = note.lineNumber ? String(note.lineNumber) : "";
     }
-    editingAttachment = note.attachment || "";
-    if (attachmentInput) {
-        attachmentInput.value = "";
-    }
+    editingAttachments = getAttachmentPaths(note);
+    clearComposerAttachmentFiles();
 
     submitButton.textContent = "Update Note";
     if (composerTitle) {
@@ -1054,14 +1075,64 @@ async function deleteNote(note) {
     }
 }
 
+function composerFileKey(file) {
+    return `${file.name}\0${file.size}\0${file.lastModified}`;
+}
+
+function mergeComposerPendingFiles(fileList) {
+    const added = Array.from(fileList || []).filter(Boolean);
+    if (added.length === 0 || !attachmentInput) {
+        return;
+    }
+
+    const keys = new Set(composerPendingFiles.map(composerFileKey));
+    for (const file of added) {
+        const key = composerFileKey(file);
+        if (!keys.has(key)) {
+            keys.add(key);
+            composerPendingFiles.push(file);
+        }
+    }
+
+    syncAttachmentInputFromPending();
+}
+
+function syncAttachmentInputFromPending() {
+    if (!attachmentInput) {
+        return;
+    }
+
+    const dataTransfer = new DataTransfer();
+    for (const file of composerPendingFiles) {
+        dataTransfer.items.add(file);
+    }
+
+    attachmentInput.files = dataTransfer.files;
+}
+
+function clearComposerAttachmentFiles() {
+    composerPendingFiles = [];
+    syncAttachmentInputFromPending();
+}
+
+function onComposerAttachmentInputChange() {
+    if (!attachmentInput?.files?.length) {
+        return;
+    }
+
+    mergeComposerPendingFiles(attachmentInput.files);
+}
+
 function resetFormState() {
+    composerPendingFiles = [];
     noteForm.reset();
+    syncAttachmentInputFromPending();
     if (descriptionEditor) {
         descriptionEditor.innerHTML = "";
     }
 
     editingNoteId = null;
-    editingAttachment = "";
+    editingAttachments = [];
     if (codeFilePathInput) {
         codeFilePathInput.value = "";
     }
@@ -1369,7 +1440,7 @@ function openModal(note) {
         modalCodeLine.textContent = codeReference.lineNumber ? `Line: L${codeReference.lineNumber}` : "";
     }
 
-    const hasAttachment = Boolean(getAttachmentPath(note));
+    const hasAttachment = getAttachmentPaths(note).length > 0;
     const attachmentMarkup = hasAttachment ? getAttachmentMarkup(note, "modal") : "";
     modalAttachment.innerHTML = attachmentMarkup;
     if (modalAttachmentsSection) {
@@ -1401,38 +1472,52 @@ function closeModal() {
     }
 
     noteModal.hidden = true;
-    closeImageZoom();
+    closeImageZoom({ immediate: true });
     syncBodyScrollLock();
     lastFocusedElement?.focus();
 }
 
-function getAttachmentMarkup(note, view) {
-    const attachment = getAttachmentPath(note);
-    if (!attachment) {
-        return "";
+function dedupeAttachmentPaths(paths) {
+    const seen = new Set();
+    const out = [];
+    for (const p of paths) {
+        const key = p.toLowerCase();
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        out.push(p);
     }
 
-    if (isImageFile(attachment)) {
-        const imageClass = view === "modal" ? "modal-attachment-image" : "note-attachment-image";
-        return `
-            <div class="attachment-block attachment-block--image">
-                <img src="${escapeHtml(attachment)}" alt="Uploaded note image" class="${imageClass}" loading="lazy" />
-            </div>
-        `;
+    return out;
+}
+
+function getAttachmentPaths(note) {
+    const paths = [];
+    if (Array.isArray(note?.attachments)) {
+        for (const p of note.attachments) {
+            const t = String(p || "").trim();
+            if (t) {
+                paths.push(t);
+            }
+        }
     }
 
-    if (view === "card") {
-        return "";
+    if (paths.length > 0) {
+        return dedupeAttachmentPaths(paths);
     }
 
-    return `
-        <div class="attachment-block attachment-block--file">
-            <a href="${escapeHtml(attachment)}" data-attachment-link target="_blank" rel="noopener noreferrer">Download attachment</a>
-        </div>
-    `;
+    const legacy = getLegacyAttachmentPath(note);
+    return legacy ? [legacy] : [];
 }
 
 function getAttachmentPath(note) {
+    const paths = getAttachmentPaths(note);
+    return paths.length > 0 ? paths[0] : "";
+}
+
+function getLegacyAttachmentPath(note) {
     const attachment = typeof note?.attachment === "string" ? note.attachment.trim() : "";
     if (attachment) {
         return attachment;
@@ -1448,6 +1533,78 @@ function getAttachmentPath(note) {
     }
 
     return "";
+}
+
+function getOneAttachmentBlockMarkup(path, view) {
+    if (isImageFile(path)) {
+        const imageClass = view === "modal" ? "modal-attachment-image" : "note-attachment-image";
+        return `
+            <div class="attachment-block attachment-block--image">
+                <img src="${escapeHtml(path)}" alt="Uploaded note image" class="${imageClass}" loading="lazy" />
+            </div>
+        `;
+    }
+
+    if (view === "card") {
+        return "";
+    }
+
+    const label = attachmentFileLabel(path);
+    return `
+        <div class="attachment-block attachment-block--file">
+            <a href="${escapeHtml(path)}" data-attachment-link target="_blank" rel="noopener noreferrer">Download ${escapeHtml(label)}</a>
+        </div>
+    `;
+}
+
+function attachmentFileLabel(path) {
+    try {
+        const u = new URL(path, window.location.origin);
+        const last = u.pathname.split("/").filter(Boolean).pop();
+        return last || "attachment";
+    } catch {
+        const parts = String(path || "").split(/[/\\]/);
+        return parts.pop() || "attachment";
+    }
+}
+
+function getAttachmentCardMarkup(paths) {
+    const images = paths.filter((p) => isImageFile(p));
+    const files = paths.filter((p) => !isImageFile(p));
+    const maxThumbs = 3;
+    let html = "";
+
+    for (let i = 0; i < Math.min(images.length, maxThumbs); i++) {
+        html += getOneAttachmentBlockMarkup(images[i], "card");
+    }
+
+    const extra = images.length - maxThumbs;
+    if (extra > 0) {
+        html += `<div class="attachment-block attachment-block--more" aria-label="${extra} more images">+${extra}</div>`;
+    }
+
+    for (const f of files) {
+        html += getOneAttachmentBlockMarkup(f, "card");
+    }
+
+    if (!html) {
+        return "";
+    }
+
+    return `<div class="note-attachments-row">${html}</div>`;
+}
+
+function getAttachmentMarkup(note, view) {
+    const paths = getAttachmentPaths(note);
+    if (paths.length === 0) {
+        return "";
+    }
+
+    if (view === "modal") {
+        return paths.map((path) => getOneAttachmentBlockMarkup(path, "modal")).join("");
+    }
+
+    return getAttachmentCardMarkup(paths);
 }
 
 function getCodeReferenceMarkup(note) {
@@ -1489,8 +1646,9 @@ function getCodeReferenceDetails(note) {
     const lineNumber = Number.isInteger(lineNumberValue) && lineNumberValue > 0
         ? lineNumberValue
         : null;
-    const attachmentPath = getAttachmentPath(note);
-    const filePath = attachmentPath && rawFilePath === attachmentPath ? "" : rawFilePath;
+    const attachmentPaths = getAttachmentPaths(note);
+    const rawLower = rawFilePath.toLowerCase();
+    const filePath = attachmentPaths.some((p) => p.toLowerCase() === rawLower) ? "" : rawFilePath;
 
     return { filePath, methodName, lineNumber };
 }
@@ -1543,30 +1701,93 @@ function openImageZoom(imageUrl) {
         return;
     }
 
-    closeImageZoom();
-    imageZoomOverlay = document.createElement("div");
-    imageZoomOverlay.className = "image-zoom-overlay";
-    imageZoomOverlay.setAttribute("role", "dialog");
-    imageZoomOverlay.setAttribute("aria-label", "Image preview");
+    closeImageZoom({ immediate: true });
+
+    imageLightboxReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const overlay = document.createElement("div");
+    overlay.className = "image-zoom-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Image preview");
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "image-zoom-backdrop";
+
+    const stage = document.createElement("div");
+    stage.className = "image-zoom-stage";
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "image-zoom-close";
+    closeButton.setAttribute("aria-label", "Close image preview");
+    closeButton.innerHTML = `<svg class="image-zoom-close__icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
     const zoomedImage = document.createElement("img");
     zoomedImage.src = imageUrl;
     zoomedImage.alt = "Zoomed note attachment";
     zoomedImage.className = "image-zoom-content";
+    zoomedImage.decoding = "async";
 
-    imageZoomOverlay.append(zoomedImage);
-    imageZoomOverlay.addEventListener("click", closeImageZoom);
-    document.body.append(imageZoomOverlay);
+    backdrop.addEventListener("click", () => {
+        closeImageZoom();
+    });
+    closeButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeImageZoom();
+    });
+
+    stage.append(zoomedImage);
+    overlay.append(backdrop, stage, closeButton);
+    document.body.append(overlay);
+    imageZoomOverlay = overlay;
+    syncBodyScrollLock();
+    closeButton.focus();
 }
 
-function closeImageZoom() {
+function restoreImageLightboxFocus() {
+    const previous = imageLightboxReturnFocus;
+    imageLightboxReturnFocus = null;
+    if (previous instanceof HTMLElement && document.contains(previous)) {
+        previous.focus({ preventScroll: true });
+    }
+}
+
+function closeImageZoom(options = {}) {
     if (!imageZoomOverlay) {
         return;
     }
 
-    imageZoomOverlay.remove();
-    imageZoomOverlay = null;
-    syncBodyScrollLock();
+    if (imageZoomCloseTimerId) {
+        window.clearTimeout(imageZoomCloseTimerId);
+        imageZoomCloseTimerId = 0;
+    }
+
+    const immediate = options.immediate === true;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (immediate || reduceMotion) {
+        imageZoomOverlay.remove();
+        imageZoomOverlay = null;
+        syncBodyScrollLock();
+        restoreImageLightboxFocus();
+        return;
+    }
+
+    if (imageZoomOverlay.dataset.closing === "true") {
+        return;
+    }
+
+    imageZoomOverlay.dataset.closing = "true";
+    imageZoomOverlay.classList.add("image-zoom-overlay--closing");
+    imageZoomCloseTimerId = window.setTimeout(() => {
+        imageZoomCloseTimerId = 0;
+        if (imageZoomOverlay) {
+            imageZoomOverlay.remove();
+            imageZoomOverlay = null;
+        }
+        syncBodyScrollLock();
+        restoreImageLightboxFocus();
+    }, 240);
 }
 
 function syncBodyScrollLock() {
@@ -1670,3 +1891,9 @@ closeComposerModal();
 closeModal();
 void loadClientConfig();
 loadNotes();
+
+if (attachmentInput) {
+    attachmentInput.multiple = true;
+}
+
+attachmentInput?.addEventListener("change", onComposerAttachmentInputChange);

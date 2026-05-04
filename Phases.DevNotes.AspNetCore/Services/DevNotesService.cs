@@ -66,11 +66,11 @@ namespace Phases.DevNotes.AspNetCore.Services
             note.Description = note.Description?.Trim() ?? string.Empty;
             note.Type = note.Type?.Trim() ?? string.Empty;
             note.CreatedBy = NormalizeCreatedBy(note.CreatedBy);
-            note.Attachment = note.Attachment?.Trim() ?? string.Empty;
             note.FilePath = note.FilePath?.Trim() ?? string.Empty;
             note.MethodName = note.MethodName?.Trim() ?? string.Empty;
             note.LineNumber = note.LineNumber is > 0 ? note.LineNumber : null;
             note.Tags = note.Tags?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList() ?? new List<string>();
+            NormalizeAttachments(note);
             if (note.CreatedAt == default)
             {
                 note.CreatedAt = DateTime.UtcNow;
@@ -95,11 +95,11 @@ namespace Phases.DevNotes.AspNetCore.Services
             updatedNote.Description = updatedNote.Description?.Trim() ?? string.Empty;
             updatedNote.Type = updatedNote.Type?.Trim() ?? string.Empty;
             updatedNote.CreatedBy = NormalizeCreatedBy(updatedNote.CreatedBy);
-            updatedNote.Attachment = updatedNote.Attachment?.Trim() ?? string.Empty;
             updatedNote.FilePath = updatedNote.FilePath?.Trim() ?? string.Empty;
             updatedNote.MethodName = updatedNote.MethodName?.Trim() ?? string.Empty;
             updatedNote.LineNumber = updatedNote.LineNumber is > 0 ? updatedNote.LineNumber : null;
             updatedNote.Tags = updatedNote.Tags?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList() ?? new List<string>();
+            NormalizeAttachments(updatedNote);
 
             lock (_sync)
             {
@@ -115,6 +115,7 @@ namespace Phases.DevNotes.AspNetCore.Services
                 existing.Type = updatedNote.Type;
                 existing.CreatedBy = updatedNote.CreatedBy;
                 existing.Attachment = updatedNote.Attachment;
+                existing.Attachments = updatedNote.Attachments;
                 existing.FilePath = updatedNote.FilePath;
                 existing.MethodName = updatedNote.MethodName;
                 existing.LineNumber = updatedNote.LineNumber;
@@ -128,6 +129,35 @@ namespace Phases.DevNotes.AspNetCore.Services
         {
             var value = createdBy?.Trim();
             return string.IsNullOrWhiteSpace(value) ? UnknownCreatedBy : value;
+        }
+
+        private static void NormalizeAttachments(DevNote note)
+        {
+            var paths = new List<string>();
+            if (note.Attachments is { Count: > 0 })
+            {
+                foreach (var p in note.Attachments)
+                {
+                    var t = p?.Trim();
+                    if (!string.IsNullOrWhiteSpace(t))
+                    {
+                        paths.Add(t);
+                    }
+                }
+            }
+
+            var legacy = note.Attachment?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(legacy) &&
+                !paths.Exists(x => x.Equals(legacy, StringComparison.OrdinalIgnoreCase)))
+            {
+                paths.Insert(0, legacy);
+            }
+
+            var distinct = paths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            note.Attachments = distinct;
+            note.Attachment = distinct.Count > 0 ? distinct[0] : string.Empty;
         }
 
         public bool Delete(Guid id)

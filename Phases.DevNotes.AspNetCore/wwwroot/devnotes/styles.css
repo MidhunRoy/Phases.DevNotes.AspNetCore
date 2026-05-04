@@ -324,6 +324,16 @@ label:first-of-type {
     margin-top: 0;
 }
 
+.field-hint {
+    margin: calc(var(--space-1) * -1) 0 var(--space-1);
+    font-size: var(--text-meta);
+    line-height: var(--text-meta--line);
+    color: var(--modal-muted, var(--muted));
+    font-weight: var(--font-regular);
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
 input,
 textarea,
 button {
@@ -1461,7 +1471,9 @@ button:disabled {
 }
 
 .modal-attachment {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
     width: 100%;
 }
 
@@ -1486,10 +1498,6 @@ button:disabled {
     margin: 0;
 }
 
-.modal-section--attachments .attachment-block + .attachment-block {
-    margin-top: var(--space-3);
-}
-
 .note-description p,
 .note-description ul,
 .modal-description p,
@@ -1511,6 +1519,10 @@ button:disabled {
     object-fit: contain;
 }
 
+.modal-description img {
+    cursor: zoom-in;
+}
+
 .note-description p:last-child,
 .note-description ul:last-child,
 .modal-description p:last-child,
@@ -1524,6 +1536,38 @@ button:disabled {
 
 .note__body .attachment-block {
     margin: 0;
+}
+
+.note-attachments-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.note-attachments-row .attachment-block--image {
+    margin: 0;
+}
+
+.note-attachments-row .note-attachment-image {
+    max-height: 120px;
+    max-width: min(140px, 42vw);
+}
+
+.attachment-block--more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    min-height: 3rem;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--note-bg) 88%, var(--note-border) 12%);
+    border: 1px dashed var(--note-border);
+    color: var(--muted);
+    font-size: var(--text-meta);
+    font-weight: var(--font-medium);
 }
 
 /* Card: thumbnail frame */
@@ -1623,25 +1667,173 @@ button:disabled {
     position: fixed;
     inset: 0;
     z-index: 1100;
+    overflow: hidden;
+    animation: imageZoomOverlayIn 240ms var(--ease-out-expo) both;
+}
+
+.image-zoom-overlay.image-zoom-overlay--closing {
+    animation: imageZoomOverlayOut 200ms ease forwards;
+}
+
+.image-zoom-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    cursor: zoom-out;
+    background: var(--image-zoom-backdrop);
+    backdrop-filter: blur(14px) saturate(1.05);
+    -webkit-backdrop-filter: blur(14px) saturate(1.05);
+}
+
+.image-zoom-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--image-zoom-backdrop);
-    cursor: zoom-out;
     padding: var(--space-3);
-    animation: fadeIn 160ms ease;
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+    pointer-events: none;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.image-zoom-close {
+    position: absolute;
+    top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-full);
+    background: rgba(15, 23, 42, 0.35);
+    color: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    cursor: pointer;
+    pointer-events: auto;
+    transition:
+        color var(--transition-micro),
+        background-color var(--transition-micro),
+        border-color var(--transition-micro),
+        transform 150ms var(--ease-micro);
+}
+
+.image-zoom-close__icon {
+    display: block;
+    flex-shrink: 0;
+    opacity: 0.92;
+    transition: opacity var(--transition-micro);
+}
+
+.image-zoom-close:hover {
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.5);
+    border-color: rgba(186, 198, 216, 0.45);
+    transform: scale(1.05);
+}
+
+.image-zoom-close:hover .image-zoom-close__icon {
+    opacity: 1;
+}
+
+.image-zoom-close:active {
+    transform: scale(0.97);
+}
+
+.image-zoom-close:focus-visible {
+    outline: none;
+    border-color: var(--focus-border);
+    box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .image-zoom-content {
-    max-width: min(96vw, 1400px);
-    max-height: 92vh;
-    width: auto;
-    height: auto;
+    position: relative;
+    z-index: 1;
+    display: block;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    /* Fixed layout box so object-fit scales image up to fill viewport (intrinsic + max-* alone stays thumbnail-sized). */
+    width: min(96vw, 1400px, calc(100vw - 2 * var(--space-3) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    height: min(88vh, calc(100dvh - 2 * var(--space-3) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
+    object-position: center;
     border-radius: var(--radius-lg);
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid rgba(148, 163, 184, 0.28);
     box-shadow: var(--shadow-lg);
-    animation: modalSheetIn var(--duration-micro) var(--ease-micro) both;
+    pointer-events: auto;
+    cursor: default;
+    animation: imageZoomContentIn 280ms var(--ease-out-expo) both;
+}
+
+.image-zoom-overlay.image-zoom-overlay--closing .image-zoom-content {
+    animation: imageZoomContentOut 200ms ease forwards;
+}
+
+@keyframes imageZoomOverlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes imageZoomOverlayOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes imageZoomContentIn {
+    from {
+        opacity: 0;
+        transform: scale(0.94);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes imageZoomContentOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .image-zoom-overlay,
+    .image-zoom-overlay .image-zoom-content {
+        animation-duration: 0.01ms !important;
+    }
+
+    .image-zoom-overlay.image-zoom-overlay--closing,
+    .image-zoom-overlay.image-zoom-overlay--closing .image-zoom-content {
+        animation-duration: 0.01ms !important;
+    }
 }
 
 @keyframes spin {
@@ -1970,9 +2162,24 @@ button:disabled {
         margin-top: 0;
     }
 
-    .image-zoom-overlay {
+    .image-zoom-stage {
         padding: var(--space-2);
         padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+        padding-left: calc(var(--space-2) + env(safe-area-inset-left, 0px));
+        padding-right: calc(var(--space-2) + env(safe-area-inset-right, 0px));
+    }
+
+    .image-zoom-close {
+        top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+        right: calc(var(--space-2) + env(safe-area-inset-right, 0px));
+        width: 44px;
+        height: 44px;
+    }
+
+    .image-zoom-content {
+        width: min(96vw, calc(100vw - 2 * var(--space-2) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+        height: min(82vh, calc(100dvh - var(--space-2) * 2 - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     }
 }
 
