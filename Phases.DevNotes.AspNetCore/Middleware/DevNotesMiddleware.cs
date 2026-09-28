@@ -18,7 +18,36 @@ namespace Phases.DevNotes.AspNetCore.Middleware
         private readonly string _routePrefix;
         private readonly string _uploadsFolder;
         private readonly string _defaultCreatedBy;
+        private readonly long _maxUploadSizeInBytes;
+        private readonly HashSet<string> _allowedUploadExtensions;
+        private readonly bool _enableTodoScanner;
+        private static readonly HashSet<string> BlockedUploadExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".exe",
+            ".dll",
+            ".bat",
+            ".cmd",
+            ".ps1",
+            ".sh",
+            ".msi",
+            ".vbs",
+            ".js",
+            ".jar"
+        };
+        private static readonly HashSet<string> ImageUploadExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp"
+        };
         private const string UnknownCreatedBy = "Unknown";
+        private const long MaxImportSizeInBytes = 5 * 1024 * 1024;
+        private static readonly HashSet<string> SupportedExportVersions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            DevNotesExport.CurrentVersion
+        };
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         private static readonly HashSet<string> IgnoredDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -48,9 +77,20 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             var uploadsFolderName = string.IsNullOrWhiteSpace(options.UploadsFolderName) ? "uploads" : options.UploadsFolderName.Trim();
             _uploadsFolder = Path.Combine(_hostEnvironment.ContentRootPath, dataFolder, uploadsFolderName);
             _defaultCreatedBy = ResolveDefaultCreatedBy(options.DefaultCreatedBy);
+            _maxUploadSizeInBytes = options.MaxUploadSizeInBytes > 0
+                ? options.MaxUploadSizeInBytes
+                : DevNotesOptions.DefaultMaxUploadSizeInBytes;
+            _allowedUploadExtensions = new HashSet<string>(
+                options.AllowedUploadExtensions ?? DevNotesOptions.DefaultAllowedUploadExtensions,
+                StringComparer.OrdinalIgnoreCase);
+            _enableTodoScanner = options.EnableTodoScanner;
         }
 
-        public async Task Invoke(HttpContext context, IDevNotesService service)
+        public async Task Invoke(
+            HttpContext context,
+            IDevNotesService service,
+            ICodePreviewService codePreviewService,
+            IDevNotesScannerService scannerService)
         {
             try
             {
@@ -106,9 +146,27 @@ namespace Phases.DevNotes.AspNetCore.Middleware
                     return;
                 }
 
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/stats")
+                {
+                    await HandleStatsAsync(context, service);
+                    return;
+                }
+
                 if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/config")
                 {
                     await WriteJsonAsync(context, StatusCodes.Status200OK, new { defaultCreatedBy = _defaultCreatedBy });
+                    return;
+                }
+
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/export")
+                {
+                    await HandleExportAsync(context, service);
+                    return;
+                }
+
+                if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path == $"{_routePrefix}/import")
+                {
+                    await HandleImportAsync(context, service);
                     return;
                 }
 
@@ -117,6 +175,24 @@ namespace Phases.DevNotes.AspNetCore.Middleware
                     var query = context.Request.Query["q"].ToString();
                     var suggestions = GetFileSuggestions(query);
                     await WriteJsonAsync(context, StatusCodes.Status200OK, new { items = suggestions });
+                    return;
+                }
+
+                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == $"{_routePrefix}/code")
+                {
+                    await HandleCodePreviewAsync(context, codePreviewService);
+                    return;
+                }
+
+                if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path == $"{_routePrefix}/scan")
+                {
+                    await HandleScanAsync(context, scannerService);
+                    return;
+                }
+
+                if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path == $"{_routePrefix}/scan/import")
+                {
+                    await HandleScanImportAsync(context, scannerService);
                     return;
                 }
 
@@ -177,57 +253,313 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             }
         }
 
+        private static async Task HandleExportAsync(HttpContext context, IDevNotesService service)
+        {
+            try
+            {
+                var export = service.Export();
+                var dateStamp = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                var fileName = $"devnotes-export-{dateStamp}.json";
+
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "application/json; charset=utf-8";
+                context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+
+                await JsonSerializer.SerializeAsync(context.Response.Body, export, JsonOptions, context.RequestAborted);
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Export failed." });
+            }
+        }
+
+        private static async Task HandleImportAsync(HttpContext context, IDevNotesService service)
+        {
+            try
+            {
+                if (!context.Request.HasFormContentType)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+                    return;
+                }
+
+                var form = await context.Request.ReadFormAsync(context.RequestAborted);
+                var file = form.Files.FirstOrDefault();
+                if (file is null || file.Length == 0)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+                    return;
+                }
+
+                if (file.Length > MaxImportSizeInBytes)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+                    return;
+                }
+
+                var extension = Path.GetExtension(file.FileName);
+                if (!string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+                    return;
+                }
+
+                DevNotesExport? exportData;
+                await using (var stream = file.OpenReadStream())
+                {
+                    exportData = await JsonSerializer.DeserializeAsync<DevNotesExport>(stream, JsonOptions, context.RequestAborted);
+                }
+
+                if (!IsValidExportFile(exportData))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+                    return;
+                }
+
+                var mode = ParseImportMode(context.Request.Query["mode"].ToString());
+                var result = service.Import(exportData!, mode);
+
+                await WriteJsonAsync(context, StatusCodes.Status200OK, new
+                {
+                    message = "Import completed",
+                    importedCount = result.ImportedCount,
+                    skippedCount = result.SkippedCount,
+                    totalNotes = result.TotalNotes
+                });
+            }
+            catch (JsonException)
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid DevNotes export file." });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Import failed." });
+            }
+        }
+
+        private async Task HandleScanAsync(HttpContext context, IDevNotesScannerService scannerService)
+        {
+            if (!_enableTodoScanner)
+            {
+                await WriteJsonAsync(context, StatusCodes.Status403Forbidden, new { error = "TODO scanner is disabled." });
+                return;
+            }
+
+            try
+            {
+                var result = scannerService.Scan();
+                await WriteJsonAsync(context, StatusCodes.Status200OK, new
+                {
+                    totalFound = result.TotalFound,
+                    items = result.Items,
+                    warning = result.Warning
+                });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Scan failed." });
+            }
+        }
+
+        private async Task HandleScanImportAsync(HttpContext context, IDevNotesScannerService scannerService)
+        {
+            if (!_enableTodoScanner)
+            {
+                await WriteJsonAsync(context, StatusCodes.Status403Forbidden, new { error = "TODO scanner is disabled." });
+                return;
+            }
+
+            try
+            {
+                var request = await JsonSerializer.DeserializeAsync<ScanImportRequest>(
+                    context.Request.Body,
+                    JsonOptions,
+                    context.RequestAborted);
+
+                if (request?.Items is null || request.Items.Count == 0)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "At least one item is required." });
+                    return;
+                }
+
+                var notesToImport = request.Items
+                    .Where(item => !string.IsNullOrWhiteSpace(item.FilePath) && item.LineNumber > 0)
+                    .Select(item => new ScannedNote
+                    {
+                        FilePath = item.FilePath.Trim(),
+                        LineNumber = item.LineNumber
+                    })
+                    .ToList();
+
+                if (notesToImport.Count == 0)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "At least one valid item is required." });
+                    return;
+                }
+
+                var result = scannerService.Import(notesToImport, _defaultCreatedBy);
+                await WriteJsonAsync(context, StatusCodes.Status200OK, new
+                {
+                    created = result.Created,
+                    skipped = result.Skipped
+                });
+            }
+            catch (JsonException)
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid JSON payload." });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Scan import failed." });
+            }
+        }
+
+        private static bool IsValidExportFile(DevNotesExport? export)
+        {
+            if (export is null)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(export.Version) || !SupportedExportVersions.Contains(export.Version.Trim()))
+            {
+                return false;
+            }
+
+            return export.Notes is not null;
+        }
+
+        private static ImportMode ParseImportMode(string? mode)
+        {
+            return string.Equals(mode?.Trim(), "replace", StringComparison.OrdinalIgnoreCase)
+                ? ImportMode.Replace
+                : ImportMode.Merge;
+        }
+
         private async Task HandleUploadAsync(HttpContext context)
         {
-            if (!context.Request.HasFormContentType)
+            try
             {
-                await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Expected multipart/form-data." });
-                return;
-            }
+                if (!context.Request.HasFormContentType)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Expected multipart/form-data." });
+                    return;
+                }
 
-            var form = await context.Request.ReadFormAsync(context.RequestAborted);
-            var file = form.Files.FirstOrDefault();
-            if (file is null || file.Length == 0)
+                var form = await context.Request.ReadFormAsync(context.RequestAborted);
+                var file = form.Files.FirstOrDefault();
+                if (file is null || file.Length == 0)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "No file uploaded." });
+                    return;
+                }
+
+                var safeExtension = NormalizeUploadExtension(Path.GetExtension(file.FileName));
+
+                if (!IsUploadSizeAllowed(file.Length))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "File size exceeds the allowed limit." });
+                    return;
+                }
+
+                if (IsBlockedExtension(safeExtension))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "This file type is blocked for security reasons." });
+                    return;
+                }
+
+                if (!IsExtensionAllowed(safeExtension))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "File type is not allowed." });
+                    return;
+                }
+
+                Directory.CreateDirectory(_uploadsFolder);
+
+                var fileName = $"{Guid.NewGuid():N}{safeExtension}";
+                var savePath = Path.Combine(_uploadsFolder, fileName);
+
+                await using (var stream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await file.CopyToAsync(stream, context.RequestAborted);
+                }
+
+                var fileUrl = $"{_routePrefix}/uploads/{fileName}";
+                var fileKind = IsImage(safeExtension, file.ContentType) ? "image" : "file";
+                await WriteJsonAsync(context, StatusCodes.Status200OK, new { fileUrl, filePath = fileUrl, fileName = file.FileName, fileKind });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {
-                await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "No file uploaded." });
-                return;
+                throw;
             }
-
-            Directory.CreateDirectory(_uploadsFolder);
-
-            var extension = Path.GetExtension(file.FileName);
-            if (string.IsNullOrWhiteSpace(extension))
+            catch (IOException)
             {
-                extension = ".bin";
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status400BadRequest, new { error = "Failed to save uploaded file." });
             }
-
-            var safeExtension = extension.Trim().ToLowerInvariant();
-            var fileName = $"{Guid.NewGuid():N}{safeExtension}";
-            var savePath = Path.Combine(_uploadsFolder, fileName);
-
-            await using (var stream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            catch (UnauthorizedAccessException)
             {
-                await file.CopyToAsync(stream, context.RequestAborted);
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status400BadRequest, new { error = "Failed to save uploaded file." });
             }
+            catch (Exception)
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Upload failed." });
+            }
+        }
 
-            var fileUrl = $"{_routePrefix}/uploads/{fileName}";
-            var fileKind = IsImage(safeExtension, file.ContentType) ? "image" : "file";
-            await WriteJsonAsync(context, StatusCodes.Status200OK, new { fileUrl, filePath = fileUrl, fileName = file.FileName, fileKind });
+        private bool IsExtensionAllowed(string extension)
+        {
+            return !string.IsNullOrEmpty(extension)
+                && !IsBlockedExtension(extension)
+                && _allowedUploadExtensions.Contains(extension);
+        }
+
+        private bool IsBlockedExtension(string extension)
+        {
+            return !string.IsNullOrEmpty(extension) && BlockedUploadExtensions.Contains(extension);
+        }
+
+        private bool IsUploadSizeAllowed(long size)
+        {
+            return size > 0 && size <= _maxUploadSizeInBytes;
         }
 
         private static bool IsImage(string extension, string? contentType)
         {
-            if (extension is ".png" or ".jpg" or ".jpeg")
+            if (string.IsNullOrWhiteSpace(contentType)
+                || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return false;
             }
 
-            if (!string.IsNullOrWhiteSpace(contentType))
+            return ImageUploadExtensions.Contains(extension);
+        }
+
+        private static string NormalizeUploadExtension(string? extension)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
             {
-                return contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+                return string.Empty;
             }
 
-            return false;
+            var value = extension.Trim().ToLowerInvariant();
+            if (!value.StartsWith('.'))
+            {
+                value = "." + value;
+            }
+
+            return value;
         }
 
         private IReadOnlyList<string> GetFileSuggestions(string? query)
@@ -503,6 +835,98 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             catch
             {
                 return string.Empty;
+            }
+        }
+
+        private static async Task HandleCodePreviewAsync(HttpContext context, ICodePreviewService codePreviewService)
+        {
+            try
+            {
+                var file = context.Request.Query["file"].ToString();
+                int? line = null;
+                var lineRaw = context.Request.Query["line"].ToString();
+                if (!string.IsNullOrWhiteSpace(lineRaw))
+                {
+                    if (!int.TryParse(lineRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedLine) || parsedLine < 1)
+                    {
+                        await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Query parameter 'line' must be a positive integer." });
+                        return;
+                    }
+
+                    line = parsedLine;
+                }
+
+                if (string.IsNullOrWhiteSpace(file))
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Query parameter 'file' is required." });
+                    return;
+                }
+
+                var result = codePreviewService.GetPreview(file, line);
+                if (result.Preview is not null)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status200OK, result.Preview);
+                    return;
+                }
+
+                var error = result.Error ?? "Unable to load code preview.";
+                var statusCode = string.Equals(error, "Source file no longer exists", StringComparison.Ordinal)
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status403Forbidden;
+
+                if (string.Equals(error, "Unable to load code preview.", StringComparison.Ordinal))
+                {
+                    statusCode = StatusCodes.Status500InternalServerError;
+                }
+
+                await WriteJsonAsync(context, statusCode, new { error });
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Unable to load code preview." });
+            }
+        }
+
+        private static async Task HandleStatsAsync(HttpContext context, IDevNotesService service)
+        {
+            try
+            {
+                var stats = service.GetStatistics();
+                await WriteJsonAsync(context, StatusCodes.Status200OK, new
+                {
+                    totalNotes = stats.TotalNotes,
+                    byType = new
+                    {
+                        bug = stats.BugCount,
+                        idea = stats.IdeaCount,
+                        task = stats.TaskCount,
+                        other = stats.OtherCount
+                    },
+                    contributors = stats.ContributorCount,
+                    topContributors = stats.TopContributors.Select(contributor => new
+                    {
+                        name = contributor.Name,
+                        count = contributor.Count
+                    }),
+                    recentActivity = new
+                    {
+                        lastUpdated = stats.LastUpdated,
+                        lastUpdatedBy = stats.LastUpdatedBy
+                    },
+                    totalAttachments = stats.TotalAttachments
+                });
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status200OK, new
+                {
+                    totalNotes = 0,
+                    byType = new { bug = 0, idea = 0, task = 0, other = 0 },
+                    contributors = 0,
+                    topContributors = Array.Empty<object>(),
+                    recentActivity = new { lastUpdated = (DateTime?)null, lastUpdatedBy = (string?)null },
+                    totalAttachments = 0
+                });
             }
         }
 

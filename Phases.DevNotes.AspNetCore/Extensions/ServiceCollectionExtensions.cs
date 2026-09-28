@@ -27,11 +27,41 @@ namespace Phases.DevNotes.AspNetCore.Extensions
                 options.DataFolderName = string.IsNullOrWhiteSpace(options.DataFolderName) ? ".devnotes" : options.DataFolderName.Trim();
                 options.UploadsFolderName = string.IsNullOrWhiteSpace(options.UploadsFolderName) ? "uploads" : options.UploadsFolderName.Trim();
                 options.DefaultCreatedBy = options.DefaultCreatedBy?.Trim() ?? string.Empty;
+
+                if (options.MaxUploadSizeInBytes <= 0)
+                {
+                    options.MaxUploadSizeInBytes = DevNotesOptions.DefaultMaxUploadSizeInBytes;
+                }
+
+                if (options.ScannerMaxFiles <= 0)
+                {
+                    options.ScannerMaxFiles = DevNotesOptions.DefaultScannerMaxFiles;
+                }
+
+                if (options.ScannerMaxFileSizeBytes <= 0)
+                {
+                    options.ScannerMaxFileSizeBytes = DevNotesOptions.DefaultScannerMaxFileSizeBytes;
+                }
+
+                if (options.AllowedUploadExtensions is null || options.AllowedUploadExtensions.Length == 0)
+                {
+                    options.AllowedUploadExtensions = DevNotesOptions.DefaultAllowedUploadExtensions;
+                }
+                else
+                {
+                    options.AllowedUploadExtensions = options.AllowedUploadExtensions
+                        .Select(NormalizeUploadExtension)
+                        .Where(extension => !string.IsNullOrEmpty(extension))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                }
             });
 
             services.TryAddSingleton<DevNotesEmbeddedAssets>();
             services.TryAddSingleton<JsonStorageProvider<DevNote>>();
             services.TryAddScoped<IDevNotesService, DevNotesService>();
+            services.TryAddScoped<ICodePreviewService, CodePreviewService>();
+            services.TryAddScoped<IDevNotesScannerService, DevNotesScannerService>();
 
             return services;
         }
@@ -56,6 +86,22 @@ namespace Phases.DevNotes.AspNetCore.Extensions
             }
 
             return value.Length > 1 ? value.TrimEnd('/') : value;
+        }
+
+        private static string NormalizeUploadExtension(string? extension)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return string.Empty;
+            }
+
+            var value = extension.Trim().ToLowerInvariant();
+            if (!value.StartsWith('.'))
+            {
+                value = "." + value;
+            }
+
+            return value;
         }
     }
 }

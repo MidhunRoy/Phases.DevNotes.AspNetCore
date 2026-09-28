@@ -13,23 +13,34 @@
     <main class="container dashboard">
         <section class="panel notes-panel">
             <header class="notes-header">
-                <div class="notes-row notes-row--primary">
-                    <div class="notes-header__title">
-                        <h1 class="app-title">Dev Notes</h1>
-                        <p class="subtitle">Capture quick development notes while building.</p>
+                <div class="notes-header__top">
+                    <h1 class="app-title">Dev Notes</h1>
+                    <button id="add-note-btn" class="add-note-btn" type="button" aria-label="Add new note">+ Add Note</button>
+                </div>
+                <p class="subtitle">Capture quick development notes while building.</p>
+                <div class="notes-header__toolbar">
+                    <div class="toolbar-actions" role="toolbar" aria-label="Dev Notes actions">
+                        <button id="export-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="Export notes">Export</button>
+                        <span class="toolbar-divider" aria-hidden="true">|</span>
+                        <button id="import-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="Import notes">Import</button>
+                        <span class="toolbar-divider" aria-hidden="true">|</span>
+                        <button id="scan-project-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="Scan project for TODO comments">Scan Project</button>
+                        <span class="toolbar-divider" aria-hidden="true">|</span>
+                        <button id="theme-toggle" class="theme-toggle toolbar-btn--neutral" type="button" aria-label="Toggle theme">Dark mode</button>
                     </div>
-                    <div class="notes-row__actions">
-                        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">Dark mode</button>
-                        <button id="add-note-btn" class="add-note-btn" type="button">Add Note</button>
-                    </div>
+                    <p class="keyboard-hints keyboard-hints--desktop" aria-label="Keyboard shortcuts">
+                        <span class="keyboard-hints__prefix" aria-hidden="true">⌨</span>
+                        <span class="keyboard-hint"><kbd>Alt</kbd>+<kbd>N</kbd> New</span>
+                        <span class="keyboard-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> Search</span>
+                    </p>
                 </div>
                 <div class="notes-row notes-row--filters">
-                    <input id="search" type="search" placeholder="Search title, description, tags..." aria-label="Search notes" autocomplete="off" />
+                    <input id="search" type="search" placeholder="Search notes, files, tags, code references..." aria-label="Search notes" autocomplete="off" />
                     <select id="filter-type" aria-label="Filter notes by type">
                         <option value="all">All types</option>
-                        <option value="bug">Bug</option>
-                        <option value="idea">Idea</option>
-                        <option value="task">Task</option>
+                        <option value="bug">🐞 Bug</option>
+                        <option value="idea">💡 Idea</option>
+                        <option value="task">✓ Task</option>
                     </select>
                     <select id="filter-user" aria-label="Filter notes by user">
                         <option value="all">All users</option>
@@ -43,6 +54,39 @@
                     <div id="notes-summary" class="notes-summary" aria-live="polite"></div>
                 </div>
             </header>
+            <section class="stats-section" aria-label="Dev Notes statistics">
+                <div class="stats-bar" role="group" aria-label="Filter notes by type">
+                    <button type="button" class="stat-pill" data-stat-filter="all" aria-pressed="true" aria-label="Show all notes">
+                        <span class="stat-pill__icon" aria-hidden="true">📒</span>
+                        <strong id="stat-total" class="stat-pill__value">-</strong>
+                        <span class="stat-pill__label">Notes</span>
+                    </button>
+                    <button type="button" class="stat-pill stat-pill--bug" data-stat-filter="bug" aria-pressed="false" aria-label="Filter bugs">
+                        <span class="stat-pill__icon" aria-hidden="true">🐞</span>
+                        <strong id="stat-bugs" class="stat-pill__value">-</strong>
+                        <span class="stat-pill__label">Bugs</span>
+                    </button>
+                    <button type="button" class="stat-pill stat-pill--task" data-stat-filter="task" aria-pressed="false" aria-label="Filter tasks">
+                        <span class="stat-pill__icon" aria-hidden="true">✓</span>
+                        <strong id="stat-tasks" class="stat-pill__value">-</strong>
+                        <span class="stat-pill__label">Tasks</span>
+                    </button>
+                    <button type="button" class="stat-pill stat-pill--idea" data-stat-filter="idea" aria-pressed="false" aria-label="Filter ideas">
+                        <span class="stat-pill__icon" aria-hidden="true">💡</span>
+                        <strong id="stat-ideas" class="stat-pill__value">-</strong>
+                        <span class="stat-pill__label">Ideas</span>
+                    </button>
+                    <span class="stat-pill stat-pill--static" aria-label="Contributors">
+                        <span class="stat-pill__icon" aria-hidden="true">👥</span>
+                        <strong id="stat-contributors" class="stat-pill__value">-</strong>
+                        <span class="stat-pill__label">Users</span>
+                    </span>
+                    <span class="stat-pill stat-pill--static stat-pill--updated" aria-label="Last updated">
+                        <span class="stat-pill__label">Updated</span>
+                        <strong id="stat-last-updated" class="stat-pill__value stat-pill__value--compact">-</strong>
+                    </span>
+                </div>
+            </section>
             <div id="status" class="status" aria-live="polite" role="status"></div>
             <div id="notes" class="notes" aria-live="polite"></div>
             <footer class="pagination" aria-label="Notes pagination">
@@ -84,6 +128,7 @@
                     <div id="modal-code-file" class="modal-code-reference__file"></div>
                     <div id="modal-code-method" class="modal-code-reference__item"></div>
                     <div id="modal-code-line" class="modal-code-reference__item"></div>
+                    <button id="modal-view-code-btn" class="code-preview-trigger hidden" type="button">View Code</button>
                 </div>
             </section>
 
@@ -148,6 +193,76 @@
                 <div class="form-actions">
                     <button id="submit-btn" type="submit">Add Note</button>
                     <button id="cancel-edit-btn" type="button" class="secondary-btn hidden">Cancel Edit</button>
+                </div>
+            </form>
+        </article>
+    </div>
+
+    <div id="code-preview-modal" class="modal-overlay code-preview-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="code-preview-title">
+        <article class="modal code-preview-modal">
+            <header class="modal__header code-preview-modal__header">
+                <h3 id="code-preview-title" class="modal-title code-preview-modal__title"></h3>
+                <button id="code-preview-close" class="modal-close" type="button" aria-label="Close code preview">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <div class="code-preview-modal__actions">
+                <a id="code-preview-open-vscode" class="code-preview-action code-preview-action--link hidden" href="#" target="_blank" rel="noopener noreferrer">Open in VS Code</a>
+                <button id="code-preview-copy" class="code-preview-action" type="button" disabled>Copy</button>
+            </div>
+            <div id="code-preview-status" class="code-preview-status" role="status" aria-live="polite"></div>
+            <div id="code-preview-body" class="code-preview-body" hidden>
+                <pre class="code-preview-block"><code id="code-preview-code"></code></pre>
+            </div>
+        </article>
+    </div>
+
+    <div id="scan-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="scan-modal-title">
+        <article class="modal scan-modal">
+            <header class="modal__header">
+                <h2 id="scan-modal-title" class="modal-title">Scan Results</h2>
+                <button id="scan-modal-close" class="modal-close" type="button" aria-label="Close scan dialog">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <div class="scan-modal__body">
+                <p id="scan-summary" class="scan-summary" aria-live="polite">Scanning project...</p>
+                <p id="scan-warning" class="scan-warning hidden" aria-live="polite"></p>
+                <div id="scan-results" class="scan-results" role="list"></div>
+            </div>
+            <div class="form-actions scan-modal__actions">
+                <button id="scan-import-btn" type="button" disabled>Import Selected</button>
+                <button id="scan-cancel-btn" type="button" class="secondary-btn scan-cancel-btn">Cancel</button>
+            </div>
+        </article>
+    </div>
+
+    <div id="import-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+        <article class="modal import-modal">
+            <header class="modal__header">
+                <h2 id="import-modal-title" class="modal-title">Import DevNotes</h2>
+                <button id="import-modal-close" class="modal-close" type="button" aria-label="Close import dialog">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <form id="import-form" class="import-form">
+                <fieldset class="import-mode-fieldset">
+                    <legend class="import-mode-legend">Import mode</legend>
+                    <label class="import-mode-option">
+                        <input type="radio" name="import-mode" value="merge" checked />
+                        Merge with existing notes
+                    </label>
+                    <label class="import-mode-option">
+                        <input type="radio" name="import-mode" value="replace" />
+                        Replace all notes
+                    </label>
+                </fieldset>
+                <label for="import-file">Select file</label>
+                <input id="import-file" name="file" type="file" accept=".json,application/json" required />
+                <p class="field-hint">Choose a DevNotes export file (JSON, max 5 MB).</p>
+                <div class="form-actions">
+                    <button id="import-submit-btn" type="submit">Import</button>
+                    <button id="import-cancel-btn" type="button" class="secondary-btn import-cancel-btn">Cancel</button>
                 </div>
             </form>
         </article>

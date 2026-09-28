@@ -189,5 +189,229 @@
       "api"
     ],
     "createdAt": "2026-05-04T09:30:29.3848576Z"
+  },
+  {
+    "id": "70052fdd-6424-40d4-82a3-5aca0b3c87bd",
+    "title": "check if value starts with \u003C, otherwise don\u0027t try stripping anything",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/jquery-validation/dist/additional-methods.js",
+    "methodName": "",
+    "lineNumber": 1431,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:44.9378538Z"
+  },
+  {
+    "id": "13855865-054c-474c-a075-425afb53715d",
+    "title": "find a way to support input types date, datetime, datetime-local, month, time and week",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/jquery-validation/dist/jquery.validate.js",
+    "methodName": "",
+    "lineNumber": 1533,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:44.959077Z"
+  },
+  {
+    "id": "6255b351-a7e7-45db-adbf-2e9efedded81",
+    "title": "identify versions",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/jquery/dist/jquery.js",
+    "methodName": "",
+    "lineNumber": 794,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:44.9811654Z"
+  },
+  {
+    "id": "6918d900-16af-47c4-8ae4-e7b69e35e273",
+    "title": "identify versions",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/jquery/dist/jquery.js",
+    "methodName": "",
+    "lineNumber": 808,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.0098124Z"
+  },
+  {
+    "id": "64e608b6-a0b5-4679-a7d2-aceeeb7007ad",
+    "title": "Now that all calls to _data and _removeData have been replaced",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/jquery/dist/jquery.js",
+    "methodName": "",
+    "lineNumber": 4466,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.035939Z"
+  },
+  {
+    "id": "4ce6c1f4-c886-44b0-a798-db84775f4b3e",
+    "title": "detection fails in mobile emulation mode in Chrome.",
+    "description": "",
+    "type": "idea",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "wwwroot/lib/bootstrap/dist/js/bootstrap.bundle.js",
+    "methodName": "",
+    "lineNumber": 2608,
+    "tags": [
+      "feature"
+    ],
+    "createdAt": "2026-05-29T12:18:45.055192Z"
+  },
+  {
+    "id": "82dd82f2-05e5-4520-83bb-5b5ca106c1c4",
+    "title": "Refactor authentication logic",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "",
+    "lineNumber": 9,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.0813271Z"
+  },
+  {
+    "id": "22a6cea9-ebf8-422a-932d-f09cecedcf3b",
+    "title": "validate email format before persisting",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "CreateUser",
+    "lineNumber": 13,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.1074127Z"
+  },
+  {
+    "id": "b44e512a-c795-463b-875f-375faa773264",
+    "title": "Token refresh fails sometimes when session is near expiry",
+    "description": "",
+    "type": "bug",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "SignInAsync",
+    "lineNumber": 20,
+    "tags": [
+      "bug"
+    ],
+    "createdAt": "2026-05-29T12:18:45.1324027Z"
+  },
+  {
+    "id": "f7a8ff3d-40a0-43ae-a0a4-352e279b01e6",
+    "title": "Memory leak when refresh token is reused",
+    "description": "",
+    "type": "bug",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "RefreshToken",
+    "lineNumber": 27,
+    "tags": [
+      "fixme"
+    ],
+    "createdAt": "2026-05-29T12:18:45.1545866Z"
+  },
+  {
+    "id": "e79ab041-1f5f-41df-919e-1ab34929b25d",
+    "title": "Temporary workaround until distributed cache is wired up",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "GetCachedResponse",
+    "lineNumber": 33,
+    "tags": [
+      "hack"
+    ],
+    "createdAt": "2026-05-29T12:18:45.1761262Z"
+  },
+  {
+    "id": "23920cee-c85a-4eda-9844-c58110525433",
+    "title": "Add export to CSV and Markdown formats",
+    "description": "",
+    "type": "idea",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "ExportNotes",
+    "lineNumber": 47,
+    "tags": [
+      "feature"
+    ],
+    "createdAt": "2026-05-29T12:18:45.2003906Z"
+  },
+  {
+    "id": "f76c6593-abd1-4979-9c8d-681518911021",
+    "title": "TODO:",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "ExportNotes",
+    "lineNumber": 52,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.2308288Z"
+  },
+  {
+    "id": "b57a4669-edb5-4975-be30-19b428aa8e42",
+    "title": "Return only tasks assigned to the current user",
+    "description": "",
+    "type": "task",
+    "createdBy": "midhun.roy@phases.io \u003CMidhun.Roy@PHSSEZSYS13\u003E",
+    "attachment": "",
+    "attachments": [],
+    "filePath": "Services/ScannerSampleService.cs",
+    "methodName": "ListPendingTasks",
+    "lineNumber": 56,
+    "tags": [
+      "todo"
+    ],
+    "createdAt": "2026-05-29T12:18:45.2574096Z"
   }
 ]

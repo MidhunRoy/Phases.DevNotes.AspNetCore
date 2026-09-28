@@ -18,6 +18,22 @@ const codeFilePathInput = document.getElementById("code-file-path");
 const codeMethodNameInput = document.getElementById("code-method-name");
 const codeLineNumberInput = document.getElementById("code-line-number");
 const codeFilePathSuggestions = document.getElementById("code-file-path-suggestions");
+const exportButton = document.getElementById("export-btn");
+const importButton = document.getElementById("import-btn");
+const importModal = document.getElementById("import-modal");
+const importForm = document.getElementById("import-form");
+const importFileInput = document.getElementById("import-file");
+const importSubmitButton = document.getElementById("import-submit-btn");
+const importCancelButton = document.getElementById("import-cancel-btn");
+const importModalCloseButton = document.getElementById("import-modal-close");
+const scanProjectButton = document.getElementById("scan-project-btn");
+const scanModal = document.getElementById("scan-modal");
+const scanModalCloseButton = document.getElementById("scan-modal-close");
+const scanCancelButton = document.getElementById("scan-cancel-btn");
+const scanImportButton = document.getElementById("scan-import-btn");
+const scanSummaryElement = document.getElementById("scan-summary");
+const scanWarningElement = document.getElementById("scan-warning");
+const scanResultsElement = document.getElementById("scan-results");
 const themeToggleButton = document.getElementById("theme-toggle");
 const previousPageButton = document.getElementById("prev-page");
 const nextPageButton = document.getElementById("next-page");
@@ -39,10 +55,33 @@ const modalCodeReferenceSection = document.getElementById("modal-code-reference-
 const modalCodeFile = document.getElementById("modal-code-file");
 const modalCodeMethod = document.getElementById("modal-code-method");
 const modalCodeLine = document.getElementById("modal-code-line");
+const modalViewCodeButton = document.getElementById("modal-view-code-btn");
+const codePreviewModal = document.getElementById("code-preview-modal");
+const codePreviewTitle = document.getElementById("code-preview-title");
+const codePreviewCloseButton = document.getElementById("code-preview-close");
+const codePreviewOpenVscodeLink = document.getElementById("code-preview-open-vscode");
+const codePreviewCopyButton = document.getElementById("code-preview-copy");
+const codePreviewStatus = document.getElementById("code-preview-status");
+const codePreviewBody = document.getElementById("code-preview-body");
+const codePreviewCode = document.getElementById("code-preview-code");
 const composerModal = document.getElementById("composer-modal");
 const composerCloseButton = document.getElementById("composer-close-btn");
 const composerTitle = document.getElementById("composer-title");
+const statTotal = document.getElementById("stat-total");
+const statBugs = document.getElementById("stat-bugs");
+const statTasks = document.getElementById("stat-tasks");
+const statIdeas = document.getElementById("stat-ideas");
+const statContributors = document.getElementById("stat-contributors");
+const statLastUpdated = document.getElementById("stat-last-updated");
+const statValueElements = [statTotal, statBugs, statTasks, statIdeas, statContributors, statLastUpdated].filter(Boolean);
+const statFilterPills = Array.from(document.querySelectorAll("[data-stat-filter]"));
 const fabRevealScrollY = 200;
+
+const NOTE_TYPE_META = {
+    bug: { icon: "\uD83D\uDC1E", label: "Bug" },
+    task: { icon: "\u2713", label: "Task" },
+    idea: { icon: "\uD83D\uDCA1", label: "Idea" }
+};
 
 const themeStorageKey = "dev-notes-theme";
 const darkTheme = "dark";
@@ -50,6 +89,8 @@ const lightTheme = "light";
 const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const blockedDescriptionTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "IFRAME", "OBJECT", "EMBED", "META", "LINK", "BASE"]);
 const apiTimeoutMs = 10000;
+let scanResults = [];
+let scanFetchController = null;
 const searchDebounceMs = 300;
 const fileSuggestionDebounceMs = 180;
 const minFileSuggestionChars = 1;
@@ -81,6 +122,11 @@ let lastPaginationKey = "";
 let lastComposerFocusedElement = null;
 let configDefaultCreatedBy = "";
 let createdByManuallyEdited = false;
+let activeStatsFetchId = 0;
+let statsFetchController = null;
+let activeModalNote = null;
+let activeCodePreviewPayload = null;
+let lastImportModalFocusedElement = null;
 
 function getPreferredTheme() {
     const stored = localStorage.getItem(themeStorageKey);
@@ -227,6 +273,222 @@ async function loadClientConfig() {
         }
     } catch {
         configDefaultCreatedBy = "";
+    }
+}
+
+function setStatsLoadingState(isLoading) {
+    for (const element of statValueElements) {
+        const pill = element.closest(".stat-pill");
+        if (isLoading) {
+            element.textContent = "-";
+            pill?.classList.add("stat-pill--loading");
+        } else {
+            pill?.classList.remove("stat-pill--loading");
+        }
+    }
+}
+
+function syncStatFilterActiveState() {
+    const activeType = (typeFilterInput?.value || "all").trim().toLowerCase();
+    for (const pill of statFilterPills) {
+        const filter = String(pill.dataset.statFilter || "all").toLowerCase();
+        const isActive = filter === activeType || (filter === "all" && activeType === "all");
+        pill.classList.toggle("stat-pill--active", isActive);
+        pill.setAttribute("aria-pressed", String(isActive));
+    }
+}
+
+function applyTypeFilterFromStat(filterValue) {
+    if (!typeFilterInput) {
+        return;
+    }
+
+    const nextValue = String(filterValue || "all").toLowerCase();
+    const allowed = new Set(["all", "bug", "task", "idea"]);
+    typeFilterInput.value = allowed.has(nextValue) ? nextValue : "all";
+    syncStatFilterActiveState();
+    currentPage = 1;
+    void loadNotes({ soft: true });
+}
+
+function applyStatistics(payload) {
+    if (!payload || typeof payload !== "object") {
+        return;
+    }
+
+    const byType = payload.byType && typeof payload.byType === "object" ? payload.byType : {};
+    if (statTotal) {
+        statTotal.textContent = String(Number(payload.totalNotes) || 0);
+    }
+    if (statBugs) {
+        statBugs.textContent = String(Number(byType.bug) || 0);
+    }
+    if (statTasks) {
+        statTasks.textContent = String(Number(byType.task) || 0);
+    }
+    if (statIdeas) {
+        statIdeas.textContent = String(Number(byType.idea) || 0);
+    }
+    if (statContributors) {
+        statContributors.textContent = String(Number(payload.contributors) || 0);
+    }
+    if (statLastUpdated) {
+        const lastUpdated = payload.recentActivity?.lastUpdated;
+        statLastUpdated.textContent = lastUpdated ? formatRelativeTime(lastUpdated) : "Never";
+    }
+}
+
+function formatExactDateTime(isoValue) {
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    return date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short"
+    });
+}
+
+function formatRelativeTime(isoValue) {
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) {
+        return "-";
+    }
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    const diffMs = Math.max(0, Date.now() - date.getTime());
+    const diffSeconds = Math.floor(diffMs / 1000);
+    if (diffSeconds < 60) {
+        return diffSeconds <= 1 ? "Just now" : `${diffSeconds} seconds ago`;
+    }
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) {
+        return diffMinutes === 1 ? "1 minute ago" : `${diffMinutes} minutes ago`;
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24 && startOfDate.getTime() === startOfToday.getTime()) {
+        return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+    }
+
+    if (startOfDate.getTime() === startOfYesterday.getTime()) {
+        return "Yesterday";
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+        return diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
+    }
+
+    return date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+    });
+}
+
+function getNoteTypeKey(type) {
+    const key = String(type || "").trim().toLowerCase();
+    return NOTE_TYPE_META[key] ? key : "";
+}
+
+function formatTypeLabel(type) {
+    const key = getNoteTypeKey(type);
+    if (!key) {
+        const raw = String(type || "").trim();
+        return raw || "";
+    }
+
+    const meta = NOTE_TYPE_META[key];
+    return `${meta.icon} ${meta.label}`;
+}
+
+function renderTypeBadge(type, { className = "note-type-badge" } = {}) {
+    const key = getNoteTypeKey(type);
+    if (!key) {
+        return "";
+    }
+
+    const meta = NOTE_TYPE_META[key];
+    const label = `${meta.icon} ${meta.label}`;
+    return `<span class="${className} ${className}--${key}">${escapeHtml(label)}</span>`;
+}
+
+function formatUserDisplayName(rawValue) {
+    let value = String(rawValue || "").trim();
+    if (!value) {
+        return defaultCreatedByFallback;
+    }
+
+    value = value.replace(/\s*<[^>]+>\s*/g, " ").trim();
+    const emailMatch = value.match(/^([^@\s]+)@/);
+    if (emailMatch) {
+        const localPart = emailMatch[1];
+        return localPart
+            .split(/[._-]+/)
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(" ");
+    }
+
+    if (value.includes("@")) {
+        return value.split("@")[0];
+    }
+
+    return value;
+}
+
+async function loadStatistics() {
+    if (statValueElements.length === 0) {
+        return;
+    }
+
+    const fetchId = ++activeStatsFetchId;
+    statsFetchController?.abort();
+    const fetchController = new AbortController();
+    statsFetchController = fetchController;
+
+    setStatsLoadingState(true);
+
+    try {
+        const response = await fetch("/devnotes/stats", {
+            signal: fetchController.signal,
+            headers: { Accept: "application/json" }
+        });
+
+        if (fetchId !== activeStatsFetchId) {
+            return;
+        }
+
+        let payload = null;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            payload = await response.json();
+        }
+
+        if (!response.ok) {
+            return;
+        }
+
+        applyStatistics(payload);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+        }
+    } finally {
+        if (fetchId === activeStatsFetchId) {
+            setStatsLoadingState(false);
+            if (statsFetchController === fetchController) {
+                statsFetchController = null;
+            }
+        }
     }
 }
 
@@ -482,6 +744,7 @@ noteForm.addEventListener("submit", async (event) => {
             // loadNotes handles its own status/error UI; avoid treating reload as save failure.
         }
 
+        void loadStatistics();
         setStatus(successMessage, false, true);
     } catch (error) {
         const message = error instanceof Error ? error.message : (isEditing ? "Failed to update note." : "Failed to save note.");
@@ -525,9 +788,16 @@ createdByInput?.addEventListener("blur", () => {
 });
 
 typeFilterInput?.addEventListener("change", () => {
+    syncStatFilterActiveState();
     currentPage = 1;
     void loadNotes({ soft: true });
 });
+
+for (const pill of statFilterPills) {
+    pill.addEventListener("click", () => {
+        applyTypeFilterFromStat(pill.dataset.statFilter || "all");
+    });
+}
 
 userFilterInput?.addEventListener("change", () => {
     applyUserFilter(userFilterInput.value);
@@ -588,8 +858,18 @@ notesContainer.addEventListener("click", (event) => {
     }
     const codeReferenceLink = event.target.closest("a[data-code-reference-link]");
     if (codeReferenceLink instanceof HTMLAnchorElement) {
-        if (codeReferenceLink.getAttribute("href") === "#") {
-            event.preventDefault();
+        const href = codeReferenceLink.getAttribute("href") || "#";
+        if (href !== "#") {
+            event.stopPropagation();
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        const noteElement = codeReferenceLink.closest(".note[data-note-index]");
+        const note = noteElement ? getRenderedNote(noteElement.dataset.noteIndex) : null;
+        if (note && getCodeReferenceDetails(note).filePath) {
+            void openCodePreview(note);
         }
         return;
     }
@@ -648,21 +928,55 @@ if (cancelEditButton) {
     });
 }
 
-document.addEventListener("keydown", (event) => {
-    const isQuickCreateShortcut = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "n";
-    if (isQuickCreateShortcut && !isTypingTarget(event.target)) {
+function handleGlobalShortcuts(event) {
+    const key = event.key.toLowerCase();
+    const isTyping = isTypingTarget(event.target);
+
+    // Ctrl+N is reserved by the browser (new window/tab) and cannot be overridden.
+    // Alt+N works reliably for "new note" on Windows/Linux; Option+N on macOS.
+    const isQuickCreateShortcut = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && key === "n";
+    if (isQuickCreateShortcut && !isTyping) {
         event.preventDefault();
+        event.stopPropagation();
         openComposerForCreate();
         return;
     }
+
+    const isSearchShortcut = (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && key === "k";
+    if (isSearchShortcut && !isTyping) {
+        event.preventDefault();
+        event.stopPropagation();
+        searchInput?.focus();
+        searchInput?.select();
+        return;
+    }
+}
+
+document.addEventListener("keydown", handleGlobalShortcuts, true);
+document.addEventListener("keydown", (event) => {
 
     if (event.key === "Escape" && imageZoomOverlay) {
         closeImageZoom();
         return;
     }
 
+    if (event.key === "Escape" && isCodePreviewModalOpen()) {
+        closeCodePreviewModal();
+        return;
+    }
+
     if (event.key === "Escape" && isNoteModalOpen()) {
         closeModal();
+        return;
+    }
+
+    if (event.key === "Escape" && isScanModalOpen()) {
+        closeScanModal();
+        return;
+    }
+
+    if (event.key === "Escape" && isImportModalOpen()) {
+        closeImportModal();
         return;
     }
 
@@ -808,12 +1122,18 @@ function renderNotes(force = false) {
         if (isFirstNoteState) {
             notesContainer.innerHTML = `
                 <div class="notes-empty notes-empty-state">
-                    <p>No notes yet</p>
-                    <button type="button" class="empty-state-action" data-empty-action="create">Add your first note</button>
+                    <p class="notes-empty-state__title">No DevNotes yet</p>
+                    <p class="notes-empty-state__subtitle">Capture bugs, ideas, and tasks while coding.</p>
+                    <button type="button" class="empty-state-action" data-empty-action="create">Create first note</button>
                 </div>
             `;
         } else {
-            notesContainer.innerHTML = `<p class="notes-empty">No notes found</p>`;
+            notesContainer.innerHTML = `
+                <div class="notes-empty notes-empty-state">
+                    <p class="notes-empty-state__title">No notes found</p>
+                    <p class="notes-empty-state__subtitle">Try adjusting search or filters.</p>
+                </div>
+            `;
         }
         return;
     }
@@ -831,11 +1151,15 @@ function renderNotes(force = false) {
     notesContainer.innerHTML = Array.from(grouped.entries())
         .map(([groupName, items]) => {
             const countLabel = items.length === 1 ? "1 note" : `${items.length} notes`;
+            const displayName = formatUserDisplayName(groupName);
             const notesMarkup = items.map((item) => renderNoteCard(item.note, item.index)).join("");
             return `
                 <section class="notes-group" data-created-by-group="${escapeHtml(groupName)}">
                     <header class="notes-group__header">
-                        <h2 class="notes-group__title">${escapeHtml(groupName)}</h2>
+                        <h2 class="notes-group__title">
+                            <span class="notes-group__icon" aria-hidden="true">\uD83D\uDC64</span>
+                            <span class="notes-group__name">${escapeHtml(displayName)}</span>
+                        </h2>
                         <span class="notes-group__count">${countLabel}</span>
                     </header>
                     <div class="notes-group__list">
@@ -888,7 +1212,7 @@ function updateUserFilterOptions() {
     for (const user of uniqueUsers) {
         const option = document.createElement("option");
         option.value = user;
-        option.textContent = user;
+        option.textContent = formatUserDisplayName(user);
         userFilterInput.append(option);
     }
 
@@ -898,51 +1222,60 @@ function updateUserFilterOptions() {
 function renderNoteCard(note, index) {
     const safeTitle = escapeHtml(note.title || "Untitled");
     const safeDescription = sanitizeDescriptionHtml(note.description || "");
-    const descriptionMarkup = safeDescription || "<p>No description.</p>";
+    const hasDescription = Boolean(stripHtml(safeDescription).trim());
+    const descriptionMarkup = hasDescription
+        ? `<div class="note__description-wrap"><div class="note-description note-description--preview">${safeDescription}</div></div>`
+        : "";
     const noteId = getNoteId(note);
     const actionButtons = noteId
         ? `
             <div class="note-actions">
                 <button type="button" class="note-action-btn" data-note-action="edit" data-note-index="${index}" aria-label="Edit note ${safeTitle}">Edit</button>
-                <button type="button" class="note-action-btn" data-note-action="delete" data-note-index="${index}" aria-label="Delete note ${safeTitle}">Delete</button>
+                <button type="button" class="note-action-btn note-action-btn--delete" data-note-action="delete" data-note-index="${index}" aria-label="Delete note ${safeTitle}">Delete</button>
             </div>
         `
         : "";
-    const safeType = note.type ? `<div class="meta meta--type">Type: ${escapeHtml(note.type)}</div>` : "";
-    const safeTags = Array.isArray(note.tags) && note.tags.length > 0
-        ? `<div class="meta meta--tags">Tags: ${escapeHtml(note.tags.join(", "))}</div>`
+    const typeKey = getNoteTypeKey(note.type);
+    const typeBadge = renderTypeBadge(note.type);
+    const tagsMarkup = Array.isArray(note.tags) && note.tags.length > 0
+        ? `<div class="note__tags">${note.tags.map((tag) => `<span class="note-tag-pill">${escapeHtml(String(tag).trim())}</span>`).join("")}</div>`
         : "";
     const attachmentMarkup = getAttachmentMarkup(note, "card");
-    const codeReferenceMarkup = getCodeReferenceMarkup(note);
-    const createdAt = note.createdAt
-        ? `<div class="meta meta--created">Created: ${new Date(note.createdAt).toLocaleString()}</div>`
+    const attachmentSection = attachmentMarkup
+        ? `<div class="note__attachments">${attachmentMarkup}</div>`
         : "";
-    const typeKey = String(note.type || "").trim().toLowerCase();
-    const noteTypeAttr = ["bug", "idea", "task"].includes(typeKey) ? ` data-note-type="${typeKey}"` : "";
-    const chipsInner = `${safeType}${safeTags}${codeReferenceMarkup}`;
-    const metaSection = chipsInner || createdAt
-        ? `<div class="note__meta">
-                ${chipsInner ? `<div class="note__chips">${chipsInner}</div>` : ""}
-                ${createdAt}
-            </div>`
+    const codeReferenceMarkup = getCodeReferenceMarkup(note, "card");
+    const codeRefSection = codeReferenceMarkup
+        ? `<div class="note__code-ref">${codeReferenceMarkup}</div>`
         : "";
-    const footer = metaSection || actionButtons
-        ? `<div class="note__footer">
-                ${metaSection}
-                ${actionButtons}
-            </div>`
+    const authorName = escapeHtml(formatUserDisplayName(getCreatedByForDisplay(note.createdBy)));
+    const createdAtRelative = note.createdAt ? formatRelativeTime(note.createdAt) : "";
+    const createdAtExact = note.createdAt ? formatExactDateTime(note.createdAt) : "";
+    const createdAtMarkup = createdAtRelative
+        ? `<time class="meta meta--created" datetime="${escapeHtml(note.createdAt)}" title="${escapeHtml(createdAtExact)}">${escapeHtml(createdAtRelative)}</time>`
         : "";
+    const noteTypeAttr = typeKey ? ` data-note-type="${typeKey}"` : "";
+    const footerMarkup = `
+        <div class="note__footer">
+            <div class="note__meta-row">
+                <span class="note__author"><span aria-hidden="true">\uD83D\uDC64 </span>${authorName}</span>
+                ${createdAtMarkup ? `<span class="note__meta-sep" aria-hidden="true">\u00B7</span>${createdAtMarkup}` : ""}
+            </div>
+        </div>
+    `;
 
     return `
         <article class="note"${noteTypeAttr} data-note-index="${index}" role="button" tabindex="0" aria-label="Open note ${safeTitle}">
             <div class="note__header">
+                ${typeBadge}
                 <h3 class="note-title">${safeTitle}</h3>
             </div>
-            <div class="note__body">
-                <div class="note-description">${descriptionMarkup}</div>
-                ${attachmentMarkup}
-            </div>
-            ${footer}
+            ${descriptionMarkup}
+            ${codeRefSection}
+            ${tagsMarkup}
+            ${attachmentSection}
+            ${footerMarkup}
+            ${actionButtons}
         </article>
     `;
 }
@@ -961,7 +1294,7 @@ function updateNotesSummary() {
     ];
 
     if (selectedUser !== "all") {
-        segments.push(selectedUser);
+        segments.push(formatUserDisplayName(selectedUser));
     }
 
     segments.push(sortLabel);
@@ -1068,6 +1401,7 @@ async function deleteNote(note) {
 
         closeModal();
         await loadNotes({ soft: false });
+        void loadStatistics();
         setStatus("Note deleted.");
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to delete note.";
@@ -1423,21 +1757,44 @@ function openModal(note) {
     }
 
     const title = note.title || "Untitled";
-    const type = note.type || "N/A";
-    const tags = Array.isArray(note.tags) && note.tags.length > 0 ? note.tags.join(", ") : "N/A";
-    const createdBy = getCreatedByForDisplay(note.createdBy);
-    const createdAt = note.createdAt ? new Date(note.createdAt).toLocaleString() : "N/A";
+    const type = formatTypeLabel(note.type) || "N/A";
+    const tags = Array.isArray(note.tags) && note.tags.length > 0
+        ? note.tags.map((tag) => `#${String(tag).trim()}`).join(" ")
+        : "N/A";
+    const createdBy = formatUserDisplayName(getCreatedByForDisplay(note.createdBy));
+    const createdAtRelative = note.createdAt ? formatRelativeTime(note.createdAt) : "N/A";
+    const createdAtExact = note.createdAt ? formatExactDateTime(note.createdAt) : "";
 
     lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modalTitle.textContent = title;
-    modalDescription.innerHTML = sanitizeDescriptionHtml(note.description) || "<p>No description.</p>";
+    const modalDescriptionHtml = sanitizeDescriptionHtml(note.description || "");
+    const hasModalDescription = Boolean(stripHtml(modalDescriptionHtml).trim());
+    modalDescription.innerHTML = hasModalDescription ? modalDescriptionHtml : "";
+    modalDescription.closest(".modal-section--description")?.classList.toggle("hidden", !hasModalDescription);
+    activeModalNote = note;
     const codeReference = getCodeReferenceDetails(note);
     const hasCodeReference = Boolean(codeReference.filePath || codeReference.methodName || codeReference.lineNumber);
     if (modalCodeReferenceSection && modalCodeFile && modalCodeMethod && modalCodeLine) {
         modalCodeReferenceSection.classList.toggle("hidden", !hasCodeReference);
-        modalCodeFile.innerHTML = codeReference.filePath ? `<strong>${escapeHtml(codeReference.filePath)}</strong>` : "";
-        modalCodeMethod.textContent = codeReference.methodName ? `Method: ${codeReference.methodName}` : "";
-        modalCodeLine.textContent = codeReference.lineNumber ? `Line: L${codeReference.lineNumber}` : "";
+        if (codeReference.filePath) {
+            const fileName = getFileBaseName(codeReference.filePath);
+            modalCodeFile.innerHTML = `<span class="modal-code-reference__icon" aria-hidden="true">\uD83D\uDCC4</span> <strong>${escapeHtml(fileName)}</strong>`;
+        } else {
+            modalCodeFile.innerHTML = "";
+        }
+
+        modalCodeMethod.textContent = codeReference.methodName
+            ? `${codeReference.methodName}()`
+            : "";
+        modalCodeLine.textContent = codeReference.lineNumber
+            ? `Line ${codeReference.lineNumber}`
+            : "";
+    }
+
+    if (modalViewCodeButton) {
+        const canViewCode = Boolean(codeReference.filePath);
+        modalViewCodeButton.classList.toggle("hidden", !canViewCode);
+        modalViewCodeButton.disabled = !canViewCode;
     }
 
     const hasAttachment = getAttachmentPaths(note).length > 0;
@@ -1446,15 +1803,22 @@ function openModal(note) {
     if (modalAttachmentsSection) {
         modalAttachmentsSection.classList.toggle("hidden", !hasAttachment);
     }
-    modalType.textContent = `Type: ${type}`;
-    modalTags.textContent = `Tags: ${tags}`;
-    modalCreatedBy.textContent = `Created by: ${createdBy}`;
-    modalCreated.textContent = `Created: ${createdAt}`;
-    const typeKey = type.trim().toLowerCase();
+    modalType.textContent = type;
+    modalTags.textContent = tags;
+    modalCreatedBy.textContent = `Created by ${createdBy}`;
+    modalCreated.textContent = createdAtRelative;
+    if (note.createdAt) {
+        modalCreated.setAttribute("title", createdAtExact);
+        modalCreated.setAttribute("datetime", note.createdAt);
+    } else {
+        modalCreated.removeAttribute("title");
+        modalCreated.removeAttribute("datetime");
+    }
+    const typeKey = getNoteTypeKey(note.type);
     for (const cls of ["type-bug", "type-idea", "type-task"]) {
         modalType.classList.remove(cls);
     }
-    if (typeKey === "bug" || typeKey === "idea" || typeKey === "task") {
+    if (typeKey) {
         modalType.classList.add(`type-${typeKey}`);
     }
     noteModal.hidden = false;
@@ -1472,6 +1836,7 @@ function closeModal() {
     }
 
     noteModal.hidden = true;
+    activeModalNote = null;
     closeImageZoom({ immediate: true });
     syncBodyScrollLock();
     lastFocusedElement?.focus();
@@ -1607,9 +1972,9 @@ function getAttachmentMarkup(note, view) {
     return getAttachmentCardMarkup(paths);
 }
 
-function getCodeReferenceMarkup(note) {
-    const referenceLabel = formatCodeReference(note);
-    if (!referenceLabel) {
+function getCodeReferenceMarkup(note, view = "default") {
+    const parts = getCodeReferenceParts(note);
+    if (!parts) {
         return "";
     }
 
@@ -1617,26 +1982,63 @@ function getCodeReferenceMarkup(note) {
     const targetAttributes = href !== "#"
         ? ' target="_blank" rel="noopener noreferrer"'
         : "";
-    return `<a class="meta meta--code-reference" data-code-reference-link href="${escapeHtml(href)}"${targetAttributes}>${escapeHtml(referenceLabel)}</a>`;
+    const ariaLabel = `View code reference: ${parts.ariaLabel}`;
+    const modifierClass = view === "card" ? " meta--code-reference--compact" : "";
+
+    if (view === "card") {
+        return `<a class="meta meta--code-reference${modifierClass}" data-code-reference-link href="${escapeHtml(href)}" aria-label="${escapeHtml(ariaLabel)}"${targetAttributes}>${escapeHtml(parts.compact)}</a>`;
+    }
+
+    return `<a class="meta meta--code-reference" data-code-reference-link href="${escapeHtml(href)}" aria-label="${escapeHtml(ariaLabel)}"${targetAttributes}><span class="note__code-file-line">${escapeHtml(parts.fileLine)}</span><span class="note__code-meta-line">${escapeHtml(parts.metaLine)}</span></a>`;
 }
 
-function formatCodeReference(note) {
+function getCodeReferenceParts(note) {
     const { filePath, methodName, lineNumber } = getCodeReferenceDetails(note);
     const lineNumberValue = Number(lineNumber);
     const hasLine = Number.isInteger(lineNumberValue) && lineNumberValue > 0;
     if (!filePath && !methodName && !hasLine) {
+        return null;
+    }
+
+    const fileName = filePath ? getFileBaseName(filePath) : "";
+    const compactParts = [];
+    if (fileName) {
+        compactParts.push(fileName);
+    }
+    if (methodName) {
+        compactParts.push(`${methodName}()`);
+    }
+    if (hasLine) {
+        compactParts.push(`L${lineNumberValue}`);
+    }
+
+    const metaParts = [];
+    if (methodName) {
+        metaParts.push(`${methodName}()`);
+    }
+    if (hasLine) {
+        metaParts.push(`Line ${lineNumberValue}`);
+    }
+
+    return {
+        fileLine: fileName ? `\uD83D\uDCC4 ${fileName}` : "",
+        metaLine: metaParts.join(" \u00B7 "),
+        compact: compactParts.length > 0 ? `\uD83D\uDCC4 ${compactParts.join(" \u00B7 ")}` : "",
+        ariaLabel: [fileName, methodName ? `${methodName}()` : "", hasLine ? `Line ${lineNumberValue}` : ""].filter(Boolean).join(", ")
+    };
+}
+
+function formatCodeReference(note, view = "default") {
+    const parts = getCodeReferenceParts(note);
+    if (!parts) {
         return "";
     }
 
-    let label = filePath || "Code reference";
-    if (methodName) {
-        label = `${label} \u2192 ${methodName}()`;
-    }
-    if (hasLine) {
-        label = `${label} (L${lineNumberValue})`;
+    if (view === "card") {
+        return parts.compact;
     }
 
-    return label;
+    return [parts.fileLine, parts.metaLine].filter(Boolean).join("\n");
 }
 
 function getCodeReferenceDetails(note) {
@@ -1791,9 +2193,653 @@ function closeImageZoom(options = {}) {
 }
 
 function syncBodyScrollLock() {
-    const shouldLock = isNoteModalOpen() || isComposerModalOpen() || imageZoomOverlay;
+    const shouldLock = isNoteModalOpen() || isComposerModalOpen() || isImportModalOpen() || isScanModalOpen() || isCodePreviewModalOpen() || imageZoomOverlay;
     document.body.style.overflow = shouldLock ? "hidden" : "";
 }
+
+function isScanModalOpen() {
+    return scanModal && !scanModal.hidden;
+}
+
+function isCodePreviewModalOpen() {
+    return codePreviewModal && !codePreviewModal.hidden;
+}
+
+function getFileBaseName(filePath) {
+    const normalized = String(filePath || "").replace(/\\/g, "/");
+    const parts = normalized.split("/").filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : normalized;
+}
+
+function setCodePreviewLoading(message) {
+    if (codePreviewStatus) {
+        codePreviewStatus.textContent = message;
+        codePreviewStatus.classList.remove("hidden");
+    }
+
+    if (codePreviewBody) {
+        codePreviewBody.hidden = true;
+    }
+
+    if (codePreviewCopyButton) {
+        codePreviewCopyButton.disabled = true;
+    }
+
+    if (codePreviewOpenVscodeLink) {
+        codePreviewOpenVscodeLink.classList.add("hidden");
+        codePreviewOpenVscodeLink.removeAttribute("href");
+    }
+}
+
+function setCodePreviewError(message) {
+    activeCodePreviewPayload = null;
+    setCodePreviewLoading(message);
+}
+
+function renderCodePreview(preview) {
+    activeCodePreviewPayload = preview;
+    const lines = Array.isArray(preview?.lines) ? preview.lines : [];
+    const gutterWidth = Math.max(2, String(preview?.endLine || lines.length || 1).length);
+
+    if (codePreviewTitle) {
+        codePreviewTitle.textContent = getFileBaseName(preview?.filePath || "");
+    }
+
+    if (codePreviewCode) {
+        codePreviewCode.innerHTML = lines.map((line) => {
+            const lineNumber = Number(line?.number) || 0;
+            const isHighlight = Boolean(line?.highlight);
+            const gutter = String(lineNumber).padStart(gutterWidth, " ");
+            const marker = isHighlight ? "&gt;" : " ";
+            const content = escapeHtml(String(line?.content ?? ""));
+            return `<div class="code-preview-line${isHighlight ? " code-preview-line--highlight" : ""}"><span class="code-preview-line__gutter" aria-hidden="true">${gutter} ${marker}</span><span class="code-preview-line__content">${content || " "}</span></div>`;
+        }).join("");
+    }
+
+    if (codePreviewStatus) {
+        codePreviewStatus.textContent = "";
+        codePreviewStatus.classList.add("hidden");
+    }
+
+    if (codePreviewBody) {
+        codePreviewBody.hidden = lines.length === 0;
+    }
+
+    if (codePreviewCopyButton) {
+        codePreviewCopyButton.disabled = lines.length === 0;
+    }
+
+    const openUrl = String(preview?.openUrl || "").trim();
+    if (codePreviewOpenVscodeLink) {
+        if (openUrl) {
+            codePreviewOpenVscodeLink.href = openUrl;
+            codePreviewOpenVscodeLink.classList.remove("hidden");
+        } else {
+            codePreviewOpenVscodeLink.classList.add("hidden");
+            codePreviewOpenVscodeLink.removeAttribute("href");
+        }
+    }
+}
+
+async function openCodePreview(note) {
+    const sourceNote = note || activeModalNote;
+    if (!sourceNote || !codePreviewModal) {
+        return;
+    }
+
+    const { filePath, lineNumber } = getCodeReferenceDetails(sourceNote);
+    if (!filePath) {
+        return;
+    }
+
+    codePreviewModal.hidden = false;
+    syncBodyScrollLock();
+    setCodePreviewLoading("Loading code preview...");
+    codePreviewCloseButton?.focus();
+
+    const params = new URLSearchParams({ file: filePath });
+    if (lineNumber) {
+        params.set("line", String(lineNumber));
+    }
+
+    try {
+        const payload = await apiRequest(`/devnotes/code?${params.toString()}`);
+        if (!payload || typeof payload !== "object") {
+            setCodePreviewError("Unable to load code preview.");
+            return;
+        }
+
+        if ("error" in payload && payload.error) {
+            setCodePreviewError(String(payload.error));
+            return;
+        }
+
+        renderCodePreview(payload);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load code preview.";
+        setCodePreviewError(message);
+    }
+}
+
+function closeCodePreviewModal() {
+    if (!codePreviewModal || codePreviewModal.hidden) {
+        return;
+    }
+
+    codePreviewModal.hidden = true;
+    activeCodePreviewPayload = null;
+    if (codePreviewCode) {
+        codePreviewCode.innerHTML = "";
+    }
+
+    syncBodyScrollLock();
+}
+
+async function copyCodePreview() {
+    const lines = Array.isArray(activeCodePreviewPayload?.lines) ? activeCodePreviewPayload.lines : [];
+    if (lines.length === 0) {
+        return;
+    }
+
+    const text = lines.map((line) => String(line?.content ?? "")).join("\n");
+    try {
+        await navigator.clipboard.writeText(text);
+        setStatus("Code copied to clipboard.");
+    } catch {
+        setStatus("Unable to copy code.");
+    }
+}
+
+modalViewCodeButton?.addEventListener("click", () => {
+    if (activeModalNote) {
+        openCodePreview(activeModalNote);
+    }
+});
+
+codePreviewCloseButton?.addEventListener("click", closeCodePreviewModal);
+codePreviewCopyButton?.addEventListener("click", () => {
+    copyCodePreview();
+});
+
+codePreviewModal?.addEventListener("click", (event) => {
+    if (event.target === codePreviewModal) {
+        closeCodePreviewModal();
+    }
+});
+
+function isImportModalOpen() {
+    return importModal && !importModal.hidden;
+}
+
+function getScanMarkerLabel(item) {
+    const tag = Array.isArray(item?.tags) && item.tags.length > 0 ? String(item.tags[0]) : "";
+    if (tag) {
+        return tag.toUpperCase();
+    }
+
+    const type = String(item?.type || "").toLowerCase();
+    if (type === "bug") {
+        return "BUG";
+    }
+
+    if (type === "idea") {
+        return "IDEA";
+    }
+
+    return "TODO";
+}
+
+function getScanMarkerClass(item) {
+    const type = String(item?.type || "task").toLowerCase();
+    if (type === "bug") {
+        return "scan-result-item__marker--bug";
+    }
+
+    if (type === "idea") {
+        return "scan-result-item__marker--idea";
+    }
+
+    return "scan-result-item__marker--task";
+}
+
+function renderScanResults(items) {
+    if (!scanResultsElement) {
+        return;
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+        scanResultsElement.innerHTML = `<p class="scan-results-empty">No developer comments found.</p>`;
+        return;
+    }
+
+    scanResultsElement.innerHTML = items.map((item, index) => {
+        const marker = escapeHtml(getScanMarkerLabel(item));
+        const markerClass = getScanMarkerClass(item);
+        const title = escapeHtml(item.title || "Untitled");
+        const filePath = escapeHtml(item.filePath || "");
+        const lineNumber = Number(item.lineNumber) > 0 ? Number(item.lineNumber) : "";
+        return `
+            <label class="scan-result-item" role="listitem" data-scan-index="${index}">
+                <input class="scan-result-item__checkbox" type="checkbox" data-scan-select checked />
+                <div class="scan-result-item__content">
+                    <div class="scan-result-item__header">
+                        <span class="scan-result-item__marker ${markerClass}">${marker}</span>
+                        <span class="scan-result-item__title">${title}</span>
+                    </div>
+                    <div class="scan-result-item__location">${filePath}${lineNumber ? ` : ${lineNumber}` : ""}</div>
+                </div>
+            </label>
+        `;
+    }).join("");
+}
+
+function updateScanImportButtonState() {
+    if (!scanImportButton) {
+        return;
+    }
+
+    const selectedCount = scanResultsElement
+        ? scanResultsElement.querySelectorAll("[data-scan-select]:checked").length
+        : 0;
+
+    scanImportButton.disabled = selectedCount === 0;
+}
+
+function openScanModal() {
+    if (!scanModal) {
+        return;
+    }
+
+    scanModal.hidden = false;
+    syncBodyScrollLock();
+}
+
+function closeScanModal() {
+    if (!scanModal || scanModal.hidden) {
+        return;
+    }
+
+    scanFetchController?.abort();
+    scanFetchController = null;
+    scanModal.hidden = true;
+    syncBodyScrollLock();
+}
+
+function setScanLoadingState(isLoading) {
+    if (isLoading && scanSummaryElement) {
+        scanSummaryElement.textContent = "Scanning project...";
+    }
+
+    if (isLoading && scanResultsElement) {
+        scanResultsElement.innerHTML = `<p class="scan-results-empty">Scanning source files...</p>`;
+    }
+
+    if (scanImportButton) {
+        scanImportButton.disabled = isLoading;
+    }
+
+    if (scanProjectButton) {
+        scanProjectButton.disabled = isLoading;
+    }
+}
+
+async function runProjectScan() {
+    openScanModal();
+    setScanLoadingState(true);
+
+    if (scanWarningElement) {
+        scanWarningElement.textContent = "";
+        scanWarningElement.classList.add("hidden");
+    }
+
+    scanFetchController?.abort();
+    const fetchController = new AbortController();
+    scanFetchController = fetchController;
+
+    try {
+        const response = await fetch("/devnotes/scan", {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            signal: fetchController.signal
+        });
+
+        let payload = null;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            payload = await response.json();
+        }
+
+        if (!response.ok) {
+            const message = payload && typeof payload === "object" && "error" in payload
+                ? String(payload.error)
+                : "Scan failed.";
+            throw new Error(message);
+        }
+
+        scanResults = Array.isArray(payload?.items) ? payload.items : [];
+        const totalFound = Number.isFinite(payload?.totalFound) ? payload.totalFound : scanResults.length;
+
+        if (scanSummaryElement) {
+            const label = totalFound === 1 ? "developer comment" : "developer comments";
+            scanSummaryElement.textContent = `Found ${totalFound} ${label}`;
+        }
+
+        if (scanWarningElement) {
+            const warning = typeof payload?.warning === "string" ? payload.warning.trim() : "";
+            if (warning) {
+                scanWarningElement.textContent = warning;
+                scanWarningElement.classList.remove("hidden");
+            } else {
+                scanWarningElement.textContent = "";
+                scanWarningElement.classList.add("hidden");
+            }
+        }
+
+        renderScanResults(scanResults);
+        updateScanImportButtonState();
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+        }
+
+        const message = error instanceof Error ? error.message : "Scan failed.";
+        if (scanSummaryElement) {
+            scanSummaryElement.textContent = message;
+        }
+
+        if (scanResultsElement) {
+            scanResultsElement.innerHTML = `<p class="scan-results-empty">${escapeHtml(message)}</p>`;
+        }
+    } finally {
+        if (scanFetchController === fetchController) {
+            scanFetchController = null;
+        }
+
+        setScanLoadingState(false);
+        if (scanProjectButton) {
+            scanProjectButton.disabled = false;
+        }
+    }
+}
+
+async function importSelectedScanResults() {
+    if (!scanResultsElement) {
+        return;
+    }
+
+    const selectedItems = [];
+    const rows = scanResultsElement.querySelectorAll("[data-scan-index]");
+    rows.forEach((row) => {
+        const checkbox = row.querySelector("[data-scan-select]");
+        if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) {
+            return;
+        }
+
+        const index = Number.parseInt(row.getAttribute("data-scan-index") || "", 10);
+        const item = scanResults[index];
+        if (!item || !item.filePath || !(Number(item.lineNumber) > 0)) {
+            return;
+        }
+
+        selectedItems.push({
+            filePath: String(item.filePath),
+            lineNumber: Number(item.lineNumber)
+        });
+    });
+
+    if (selectedItems.length === 0) {
+        setStatus("Select at least one scanned comment.", true);
+        return;
+    }
+
+    if (scanImportButton) {
+        scanImportButton.disabled = true;
+    }
+
+    setStatus("Importing scanned notes...");
+
+    try {
+        const payload = await apiRequest("/devnotes/scan/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: selectedItems })
+        });
+
+        closeScanModal();
+        currentPage = 1;
+        await loadNotes({ soft: false });
+        await loadStatistics();
+
+        const created = Number(payload?.created) || 0;
+        const skipped = Number(payload?.skipped) || 0;
+        let successMessage = `${created} note${created === 1 ? "" : "s"} imported`;
+        if (skipped > 0) {
+            successMessage += `, ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped`;
+        }
+        successMessage += ".";
+
+        setStatus(successMessage, false, true);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Scan import failed.";
+        setStatus(message, true);
+        updateScanImportButtonState();
+    } finally {
+        updateScanImportButtonState();
+    }
+}
+
+function openImportModal() {
+    if (!importModal) {
+        return;
+    }
+
+    if (importForm) {
+        importForm.reset();
+        const mergeRadio = importForm.querySelector('input[name="import-mode"][value="merge"]');
+        if (mergeRadio instanceof HTMLInputElement) {
+            mergeRadio.checked = true;
+        }
+    }
+
+    lastImportModalFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    importModal.hidden = false;
+    syncBodyScrollLock();
+    importFileInput?.focus();
+}
+
+function closeImportModal() {
+    if (!importModal || importModal.hidden) {
+        return;
+    }
+
+    importModal.hidden = true;
+    syncBodyScrollLock();
+    lastImportModalFocusedElement?.focus();
+}
+
+async function exportDevNotes() {
+    try {
+        setStatus("Preparing export...");
+        const response = await fetch("/devnotes/export", {
+            headers: { Accept: "application/json" }
+        });
+
+        if (!response.ok) {
+            throw new Error("Export failed.");
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get("content-disposition") || "";
+        const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+        const fileName = fileNameMatch?.[1] || `devnotes-export-${new Date().toISOString().slice(0, 10)}.json`;
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = fileName;
+        link.rel = "noopener";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+        setStatus("Export downloaded.", false, true);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Export failed.";
+        setStatus(message, true);
+    }
+}
+
+function getSelectedImportMode() {
+    const selected = importForm?.querySelector('input[name="import-mode"]:checked');
+    if (selected instanceof HTMLInputElement && selected.value === "replace") {
+        return "replace";
+    }
+
+    return "merge";
+}
+
+async function submitImport(event) {
+    event.preventDefault();
+
+    const file = importFileInput?.files?.[0];
+    if (!file) {
+        setStatus("Select a DevNotes export file.", true);
+        return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".json")) {
+        setStatus("Only .json export files are allowed.", true);
+        return;
+    }
+
+    const maxImportBytes = 5 * 1024 * 1024;
+    if (file.size > maxImportBytes) {
+        setStatus("Import file exceeds the 5 MB limit.", true);
+        return;
+    }
+
+    const mode = getSelectedImportMode();
+    if (mode === "replace") {
+        const confirmed = window.confirm("Replace all notes? A backup will be created automatically.");
+        if (!confirmed) {
+            return;
+        }
+    }
+
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    if (importSubmitButton) {
+        importSubmitButton.disabled = true;
+    }
+
+    setStatus("Importing notes...");
+
+    try {
+        const response = await fetch(`/devnotes/import?mode=${encodeURIComponent(mode)}`, {
+            method: "POST",
+            body: formData
+        });
+
+        let payload = null;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            payload = await response.json();
+        }
+
+        if (!response.ok) {
+            const message = payload && typeof payload === "object" && "error" in payload
+                ? String(payload.error)
+                : "Import failed.";
+            throw new Error(message);
+        }
+
+        closeImportModal();
+        currentPage = 1;
+        await loadNotes({ soft: false });
+        await loadStatistics();
+
+        const importedCount = Number(payload?.importedCount) || 0;
+        const skippedCount = Number(payload?.skippedCount) || 0;
+        let successMessage = `Import completed. ${importedCount} note${importedCount === 1 ? "" : "s"} imported`;
+        if (skippedCount > 0) {
+            successMessage += `, ${skippedCount} duplicate${skippedCount === 1 ? "" : "s"} skipped`;
+        }
+        successMessage += ".";
+
+        setStatus(successMessage, false, true);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Import failed.";
+        setStatus(message, true);
+    } finally {
+        if (importSubmitButton) {
+            importSubmitButton.disabled = false;
+        }
+    }
+}
+
+exportButton?.addEventListener("click", () => {
+    void exportDevNotes();
+});
+
+importButton?.addEventListener("click", () => {
+    openImportModal();
+});
+
+scanProjectButton?.addEventListener("click", () => {
+    void runProjectScan();
+});
+
+scanImportButton?.addEventListener("click", () => {
+    void importSelectedScanResults();
+});
+
+scanCancelButton?.addEventListener("click", () => {
+    closeScanModal();
+});
+
+scanModalCloseButton?.addEventListener("click", () => {
+    closeScanModal();
+});
+
+scanResultsElement?.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.matches("[data-scan-select]")) {
+        updateScanImportButtonState();
+    }
+});
+
+scanModal?.addEventListener("click", (event) => {
+    const clickTarget = event.target;
+    if (!(clickTarget instanceof Element)) {
+        return;
+    }
+
+    if (!clickTarget.closest(".scan-modal")) {
+        closeScanModal();
+    }
+});
+
+importForm?.addEventListener("submit", (event) => {
+    void submitImport(event);
+});
+
+importCancelButton?.addEventListener("click", () => {
+    closeImportModal();
+});
+
+importModalCloseButton?.addEventListener("click", () => {
+    closeImportModal();
+});
+
+importModal?.addEventListener("click", (event) => {
+    const clickTarget = event.target;
+    if (!(clickTarget instanceof Element)) {
+        return;
+    }
+
+    if (!clickTarget.closest(".import-modal")) {
+        closeImportModal();
+    }
+});
 
 async function loadCodeFileSuggestions() {
     if (!codeFilePathInput || !codeFilePathSuggestions) {
@@ -1881,15 +2927,25 @@ function setStatus(message, isError = false, isSuccess = false) {
 }
 
 initializeTheme();
+syncStatFilterActiveState();
 if (composerModal) {
     composerModal.hidden = true;
+}
+if (importModal) {
+    importModal.hidden = true;
+}
+if (scanModal) {
+    scanModal.hidden = true;
 }
 if (noteModal) {
     noteModal.hidden = true;
 }
 closeComposerModal();
+closeImportModal();
+closeScanModal();
 closeModal();
 void loadClientConfig();
+void loadStatistics();
 loadNotes();
 
 if (attachmentInput) {

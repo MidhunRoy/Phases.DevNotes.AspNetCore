@@ -9,5 +9,8 @@ namespace Phases.DevNotes.AspNetCore.Services
         void Add(DevNote note);
         DevNote? Update(Guid id, DevNote updatedNote);
         bool Delete(Guid id);
+        DevNotesStats GetStatistics();
+        DevNotesExport Export();
+        ImportResult Import(DevNotesExport data, ImportMode mode);
     }
 }
