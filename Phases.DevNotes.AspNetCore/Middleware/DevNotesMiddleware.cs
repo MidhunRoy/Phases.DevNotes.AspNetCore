@@ -90,7 +90,8 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             HttpContext context,
             IDevNotesService service,
             ICodePreviewService codePreviewService,
-            IDevNotesScannerService scannerService)
+            IDevNotesScannerService scannerService,
+            ICodeGuidePdfExportService codeGuidePdfExportService)
         {
             try
             {
@@ -118,6 +119,12 @@ namespace Phases.DevNotes.AspNetCore.Middleware
                         sort = normalizedSort,
                         items = result.Items ?? new List<DevNote>()
                     });
+                    return;
+                }
+
+                if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path == $"{_routePrefix}/code-guide/export.pdf")
+                {
+                    await HandleCodeGuidePdfExportAsync(context, codeGuidePdfExportService);
                     return;
                 }
 
@@ -270,6 +277,51 @@ namespace Phases.DevNotes.AspNetCore.Middleware
             catch
             {
                 await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Export failed." });
+            }
+        }
+
+        private static async Task HandleCodeGuidePdfExportAsync(HttpContext context, ICodeGuidePdfExportService exportService)
+        {
+            try
+            {
+                CodeGuidePdfExportRequest? request;
+                try
+                {
+                    request = await JsonSerializer.DeserializeAsync<CodeGuidePdfExportRequest>(
+                        context.Request.Body,
+                        JsonOptions,
+                        context.RequestAborted);
+                }
+                catch (JsonException)
+                {
+                    await WriteJsonAsync(context, StatusCodes.Status400BadRequest, new { error = "Invalid export request." });
+                    return;
+                }
+
+                request ??= new CodeGuidePdfExportRequest();
+                var result = exportService.Export(request);
+                if (!result.Success || result.PdfBytes is null)
+                {
+                    await WriteJsonAsync(
+                        context,
+                        StatusCodes.Status400BadRequest,
+                        new { error = result.Error ?? "Failed to generate Code Guide PDF." });
+                    return;
+                }
+
+                var fileName = string.IsNullOrWhiteSpace(result.FileName)
+                    ? $"code-guide-{DateTime.UtcNow:yyyy-MM-dd}.pdf"
+                    : result.FileName;
+
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "application/pdf";
+                context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+                context.Response.ContentLength = result.PdfBytes.Length;
+                await context.Response.Body.WriteAsync(result.PdfBytes, context.RequestAborted);
+            }
+            catch
+            {
+                await TryWriteJsonSafeAsync(context, StatusCodes.Status500InternalServerError, new { error = "Failed to generate Code Guide PDF." });
             }
         }
 

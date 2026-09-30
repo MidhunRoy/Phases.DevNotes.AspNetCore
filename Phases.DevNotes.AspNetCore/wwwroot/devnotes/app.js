@@ -39,12 +39,29 @@ const previousPageButton = document.getElementById("prev-page");
 const nextPageButton = document.getElementById("next-page");
 const pageIndicator = document.getElementById("page-indicator");
 const addNoteButton = document.getElementById("add-note-btn");
+const codeGuideAddNoteButton = document.getElementById("code-guide-add-note-btn");
+const codeGuideExportButton = document.getElementById("code-guide-export-btn");
+const codeGuideHelpButton = document.getElementById("code-guide-help-btn");
+const guideHelpModal = document.getElementById("guide-help-modal");
+const guideHelpCloseButton = document.getElementById("guide-help-close");
+const guideHelpCloseActionButton = document.getElementById("guide-help-close-btn");
+const guideHelpScanButton = document.getElementById("guide-help-scan-btn");
+const codeGuideExportModal = document.getElementById("code-guide-export-modal");
+const codeGuideExportForm = document.getElementById("code-guide-export-form");
+const codeGuideExportCloseButton = document.getElementById("code-guide-export-close");
+const codeGuideExportCancelButton = document.getElementById("code-guide-export-cancel");
+const codeGuideExportSubmitButton = document.getElementById("code-guide-export-submit");
+const codeGuideExportFilesPanel = document.getElementById("code-guide-export-files-panel");
+const codeGuideExportFiles = document.getElementById("code-guide-export-files");
+const codeGuideExportHint = document.getElementById("code-guide-export-hint");
 const quickAddNoteFab = document.getElementById("quick-add-note-fab");
 const noteModal = document.getElementById("note-modal");
 const noteModalContent = noteModal?.querySelector("[data-modal-content]") ?? null;
 const modalCloseButton = document.getElementById("modal-close");
 const modalTitle = document.getElementById("modal-title");
+const modalDescriptionTitle = document.getElementById("modal-description-title");
 const modalDescription = document.getElementById("modal-description");
+const modalMetadataTitle = document.getElementById("modal-metadata-title");
 const modalType = document.getElementById("modal-type");
 const modalTags = document.getElementById("modal-tags");
 const modalCreatedBy = document.getElementById("modal-created-by");
@@ -52,10 +69,28 @@ const modalCreated = document.getElementById("modal-created");
 const modalAttachmentsSection = document.getElementById("modal-attachments-section");
 const modalAttachment = document.getElementById("modal-attachment");
 const modalCodeReferenceSection = document.getElementById("modal-code-reference-section");
+const modalCodeReferenceTitle = document.getElementById("modal-code-reference-title");
 const modalCodeFile = document.getElementById("modal-code-file");
 const modalCodeMethod = document.getElementById("modal-code-method");
 const modalCodeLine = document.getElementById("modal-code-line");
 const modalViewCodeButton = document.getElementById("modal-view-code-btn");
+const modalCodeGuideActions = document.getElementById("modal-code-guide-actions");
+const modalEditButton = document.getElementById("modal-edit-btn");
+const modalCloseActionButton = document.getElementById("modal-close-action-btn");
+const modalGuideLearning = document.getElementById("modal-guide-learning");
+const modalGuideSections = document.getElementById("modal-guide-sections");
+const modalGuideWhereBlock = document.getElementById("modal-guide-where-block");
+const modalGuideWhere = document.getElementById("modal-guide-where");
+const modalGuideMethodBlock = document.getElementById("modal-guide-method-block");
+const modalGuideMethod = document.getElementById("modal-guide-method");
+const modalGuideTagsBlock = document.getElementById("modal-guide-tags-block");
+const modalGuideTags = document.getElementById("modal-guide-tags");
+const modalGuideSecondary = document.getElementById("modal-guide-secondary");
+const modalGuideSecondaryType = document.getElementById("modal-guide-secondary-type");
+const modalGuideSecondaryCreatedBy = document.getElementById("modal-guide-secondary-created-by");
+const modalGuideSecondaryCreated = document.getElementById("modal-guide-secondary-created");
+const notesOnlyModalSections = Array.from(document.querySelectorAll("[data-notes-only-section]"));
+const guideCardPreviewMax = 160;
 const codePreviewModal = document.getElementById("code-preview-modal");
 const codePreviewTitle = document.getElementById("code-preview-title");
 const codePreviewCloseButton = document.getElementById("code-preview-close");
@@ -67,6 +102,27 @@ const codePreviewCode = document.getElementById("code-preview-code");
 const composerModal = document.getElementById("composer-modal");
 const composerCloseButton = document.getElementById("composer-close-btn");
 const composerTitle = document.getElementById("composer-title");
+const dashboardRoot = document.querySelector(".dashboard");
+const modeNotesBtn = document.getElementById("mode-notes-btn");
+const modeCodeGuideBtn = document.getElementById("mode-code-guide-btn");
+const notesModeHeader = document.getElementById("notes-mode-header");
+const codeGuideModeHeader = document.getElementById("code-guide-mode-header");
+const notesModeFilters = document.getElementById("notes-mode-filters");
+const codeGuideModeFilters = document.getElementById("code-guide-mode-filters");
+const notesModeSummary = document.getElementById("notes-mode-summary");
+const codeGuideModeSummary = document.getElementById("code-guide-mode-summary");
+const notesModeStats = document.getElementById("notes-mode-stats");
+const notesPagination = document.getElementById("notes-pagination");
+const guideSearchInput = document.getElementById("guide-search");
+const guideSearchClearButton = document.getElementById("guide-search-clear");
+const guideFilterFile = document.getElementById("guide-filter-file");
+const guideFilterConcept = document.getElementById("guide-filter-concept");
+const guideFilterTag = document.getElementById("guide-filter-tag");
+const guideClearFiltersButton = document.getElementById("guide-clear-filters");
+const guideMoreFiltersButton = document.getElementById("guide-more-filters-btn");
+const guideMoreFiltersPanel = document.getElementById("guide-more-filters");
+const guideSummaryElement = document.getElementById("guide-summary");
+const guideUiStateStorageKey = "devnotes_code_guide_ui_state";
 const statTotal = document.getElementById("stat-total");
 const statBugs = document.getElementById("stat-bugs");
 const statTasks = document.getElementById("stat-tasks");
@@ -76,11 +132,15 @@ const statLastUpdated = document.getElementById("stat-last-updated");
 const statValueElements = [statTotal, statBugs, statTasks, statIdeas, statContributors, statLastUpdated].filter(Boolean);
 const statFilterPills = Array.from(document.querySelectorAll("[data-stat-filter]"));
 const fabRevealScrollY = 200;
+const MODE_NOTES = "notes";
+const MODE_CODE_GUIDE = "code-guide";
+const guideFetchPageSize = 100;
 
 const NOTE_TYPE_META = {
     bug: { icon: "\uD83D\uDC1E", label: "Bug" },
     task: { icon: "\u2713", label: "Task" },
-    idea: { icon: "\uD83D\uDCA1", label: "Idea" }
+    idea: { icon: "\uD83D\uDCA1", label: "Idea" },
+    code: { icon: "\uD83D\uDD39", label: "Code" }
 };
 
 const themeStorageKey = "dev-notes-theme";
@@ -127,6 +187,19 @@ let statsFetchController = null;
 let activeModalNote = null;
 let activeCodePreviewPayload = null;
 let lastImportModalFocusedElement = null;
+let dashboardMode = MODE_NOTES;
+let codeGuideSourceNotes = [];
+let codeGuideSurfaceReady = false;
+let guideModalPresentation = false;
+let activeGuideFetchId = 0;
+let guideFetchController = null;
+let lastGuideSummaryText = "";
+let lastGuideRenderSignature = "";
+/** @type {Record<string, boolean>} */
+let guideCollapsedFiles = {};
+let guideMoreFiltersOpen = false;
+/** Currently selected Code Guide annotation id (for Code Map / card highlight). */
+let selectedGuideNoteId = "";
 
 function getPreferredTheme() {
     const stored = localStorage.getItem(themeStorageKey);
@@ -304,7 +377,7 @@ function applyTypeFilterFromStat(filterValue) {
     }
 
     const nextValue = String(filterValue || "all").toLowerCase();
-    const allowed = new Set(["all", "bug", "task", "idea"]);
+    const allowed = new Set(["all", "bug", "task", "idea", "code"]);
     typeFilterInput.value = allowed.has(nextValue) ? nextValue : "all";
     syncStatFilterActiveState();
     currentPage = 1;
@@ -535,7 +608,9 @@ function debounce(fn, delayMs) {
 
 function setLoadingState(isLoading, { soft = false } = {}) {
     notesContainer.setAttribute("aria-busy", String(isLoading));
-    searchInput.disabled = isLoading && !soft;
+    if (searchInput) {
+        searchInput.disabled = isLoading && !soft;
+    }
     if (typeFilterInput) {
         typeFilterInput.disabled = isLoading && !soft;
     }
@@ -545,13 +620,34 @@ function setLoadingState(isLoading, { soft = false } = {}) {
     if (sortOrderInput) {
         sortOrderInput.disabled = isLoading && !soft;
     }
+    if (guideSearchInput) {
+        guideSearchInput.disabled = isLoading && !soft;
+    }
+    if (guideSearchClearButton) {
+        guideSearchClearButton.disabled = isLoading && !soft;
+    }
+    if (guideFilterFile) {
+        guideFilterFile.disabled = isLoading && !soft;
+    }
+    if (guideFilterConcept) {
+        guideFilterConcept.disabled = isLoading && !soft;
+    }
+    if (guideFilterTag) {
+        guideFilterTag.disabled = isLoading && !soft;
+    }
+    if (guideClearFiltersButton) {
+        guideClearFiltersButton.disabled = isLoading && !soft;
+    }
+    if (guideMoreFiltersButton) {
+        guideMoreFiltersButton.disabled = isLoading && !soft;
+    }
     notesContainer.classList.toggle("notes-loading", isLoading && soft);
 
     if (isLoading && !soft) {
         notesContainer.innerHTML = `
             <div class="loading-indicator" role="status" aria-live="polite">
                 <span class="spinner" aria-hidden="true"></span>
-                <span>Loading notes...</span>
+                <span>${isCodeGuideMode() ? "Loading Code Guide..." : "Loading notes..."}</span>
             </div>
         `;
     }
@@ -658,6 +754,1117 @@ async function loadNotes(options = {}) {
     }
 }
 
+function isCodeGuideMode() {
+    return dashboardMode === MODE_CODE_GUIDE;
+}
+
+function setDashboardMode(mode) {
+    const nextMode = mode === MODE_CODE_GUIDE ? MODE_CODE_GUIDE : MODE_NOTES;
+    if (dashboardMode === nextMode) {
+        return;
+    }
+
+    dashboardMode = nextMode;
+    dashboardRoot?.setAttribute("data-dashboard-mode", nextMode);
+
+    const isGuide = nextMode === MODE_CODE_GUIDE;
+    modeNotesBtn?.classList.toggle("mode-tab--active", !isGuide);
+    modeCodeGuideBtn?.classList.toggle("mode-tab--active", isGuide);
+    modeNotesBtn?.setAttribute("aria-selected", String(!isGuide));
+    modeCodeGuideBtn?.setAttribute("aria-selected", String(isGuide));
+
+    if (notesModeHeader) {
+        notesModeHeader.hidden = isGuide;
+    }
+    if (codeGuideModeHeader) {
+        codeGuideModeHeader.hidden = !isGuide;
+    }
+    if (notesModeFilters) {
+        notesModeFilters.hidden = isGuide;
+    }
+    if (codeGuideModeFilters) {
+        codeGuideModeFilters.hidden = !isGuide;
+    }
+    if (notesModeSummary) {
+        notesModeSummary.hidden = isGuide;
+    }
+    if (codeGuideModeSummary) {
+        codeGuideModeSummary.hidden = !isGuide;
+    }
+    if (notesModeStats) {
+        notesModeStats.hidden = isGuide;
+    }
+    if (notesPagination) {
+        notesPagination.hidden = isGuide;
+    }
+
+    notesContainer.classList.toggle("notes--code-guide", isGuide);
+    renderSignature = "";
+    lastGuideRenderSignature = "";
+    if (!isGuide) {
+        selectedGuideNoteId = "";
+    }
+    void refreshActiveDashboard({ soft: false }).then(() => {
+        if (isGuide) {
+            syncGuideClearFiltersVisibility();
+            guideSearchInput?.focus();
+        }
+    });
+}
+
+async function refreshActiveDashboard(options = {}) {
+    if (isCodeGuideMode()) {
+        await loadCodeGuideNotes(options);
+        return;
+    }
+
+    await loadNotes(options);
+}
+
+function isCodeGuideAnnotation(note) {
+    return Boolean(getCodeReferenceDetails(note).filePath);
+}
+
+function normalizeGuidePath(path) {
+    return String(path || "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
+}
+
+function getGuideConceptKey(note) {
+    const type = String(note?.type || "").trim().toLowerCase();
+    return type || "untagged";
+}
+
+function getGuideConceptVisual(note) {
+    const key = getNoteTypeKey(note?.type);
+    if (key === "bug") {
+        return { icon: "\uD83D\uDC1E", tone: "bug" };
+    }
+    if (key === "task") {
+        return { icon: "\u2713", tone: "task" };
+    }
+    if (key === "code") {
+        return { icon: "\uD83D\uDD39", tone: "code" };
+    }
+    if (key === "idea") {
+        const palette = [
+            { icon: "\uD83D\uDD39", tone: "idea" },
+            { icon: "\uD83D\uDFE3", tone: "concept" },
+            { icon: "\uD83D\uDFE1", tone: "accent" }
+        ];
+        const hash = Array.from(String(note?.title || "")).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        return palette[hash % palette.length];
+    }
+
+    return { icon: "\uD83D\uDD39", tone: "neutral" };
+}
+
+function getGuideDescriptionPreview(note) {
+    return getGuideCardPreview(note);
+}
+
+function getGuidePlainDescription(note) {
+    const raw = String(note?.description || "");
+    if (!raw.trim()) {
+        return "";
+    }
+
+    // Preserve paragraph/line breaks from RTE HTML so WHAT/WHY splitting still works.
+    const withBreaks = raw
+        .replace(/<\s*br\s*\/?>/gi, "\n")
+        .replace(/<\/\s*(p|div|li|h[1-6]|tr)\s*>/gi, "\n")
+        .replace(/<\s*(p|div|li|h[1-6]|tr)(\s[^>]*)?>/gi, "\n");
+
+    return stripHtml(withBreaks).replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Supported DEVNOTE learning field labels → Code Guide question headings.
+ * Matching is case-insensitive; "Why here" is checked before "Why".
+ */
+const GUIDE_LEARNING_FIELDS = [
+    { key: "what", labelPattern: /^what$/i, question: "What does this do?", displayOrder: 1 },
+    { key: "why", labelPattern: /^why$/i, question: "Why is it used?", displayOrder: 2 },
+    { key: "whyHere", labelPattern: /^why\s+here$/i, question: "Why is it here?", displayOrder: 3 },
+    { key: "advantage", labelPattern: /^advantage$/i, question: "What is the advantage?", displayOrder: 4 },
+    { key: "how", labelPattern: /^how$/i, question: "How does it work?", displayOrder: 5 },
+    { key: "example", labelPattern: /^example$/i, question: "Example", displayOrder: 6 }
+];
+
+const GUIDE_STRUCTURED_FIELD_LINE = /^(What|Why\s+here|Why|Advantage|How|Example)\s*:\s*(.*)$/i;
+
+function matchGuideLearningField(labelText) {
+    const normalized = String(labelText || "").trim().replace(/\s+/g, " ");
+    // Prefer longer / more specific matches first (Why here before Why).
+    const ordered = [
+        GUIDE_LEARNING_FIELDS.find((field) => field.key === "whyHere"),
+        ...GUIDE_LEARNING_FIELDS.filter((field) => field.key !== "whyHere")
+    ];
+    return ordered.find((field) => field.labelPattern.test(normalized)) || null;
+}
+
+/**
+ * Parse stored Description into structured learning sections.
+ * Does not invent missing fields — only returns labels present in the text.
+ * Falls back to legacy first-line / remaining-lines for unlabeled freeform notes.
+ * @returns {{ sections: Array<{ key: string, question: string, answer: string }>, preamble: string, what: string, why: string }}
+ */
+function parseGuideExplanation(description) {
+    const normalized = String(description || "").replace(/\r\n/g, "\n").trim();
+    if (!normalized) {
+        return { sections: [], preamble: "", what: "", why: "" };
+    }
+
+    const lines = normalized.split("\n").map((line) => line.trimEnd());
+    const preambleLines = [];
+    /** @type {Map<string, { key: string, question: string, answer: string, displayOrder: number }>} */
+    const sectionMap = new Map();
+    let currentKey = null;
+    let sawStructuredLabel = false;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+            if (currentKey && sectionMap.has(currentKey)) {
+                const existing = sectionMap.get(currentKey);
+                existing.answer = `${existing.answer}\n`;
+            }
+            continue;
+        }
+
+        const match = line.match(GUIDE_STRUCTURED_FIELD_LINE);
+        if (match) {
+            const field = matchGuideLearningField(match[1]);
+            if (field) {
+                sawStructuredLabel = true;
+                currentKey = field.key;
+                const value = String(match[2] ?? "").trimEnd();
+                if (sectionMap.has(field.key)) {
+                    const existing = sectionMap.get(field.key);
+                    if (value) {
+                        existing.answer = existing.answer
+                            ? `${existing.answer}\n${value}`
+                            : value;
+                    }
+                } else {
+                    sectionMap.set(field.key, {
+                        key: field.key,
+                        question: field.question,
+                        answer: value,
+                        displayOrder: field.displayOrder
+                    });
+                }
+                continue;
+            }
+        }
+
+        if (currentKey && sectionMap.has(currentKey)) {
+            const existing = sectionMap.get(currentKey);
+            existing.answer = existing.answer ? `${existing.answer}\n${line}` : line;
+            continue;
+        }
+
+        if (!sawStructuredLabel) {
+            preambleLines.push(line);
+        }
+    }
+
+    if (sawStructuredLabel) {
+        const sections = Array.from(sectionMap.values())
+            .map((section) => ({
+                key: section.key,
+                question: section.question,
+                answer: String(section.answer || "").replace(/\n{3,}/g, "\n\n").trim()
+            }))
+            .filter((section) => section.answer.length > 0)
+            .sort((a, b) => {
+                const orderA = GUIDE_LEARNING_FIELDS.find((field) => field.key === a.key)?.displayOrder ?? 99;
+                const orderB = GUIDE_LEARNING_FIELDS.find((field) => field.key === b.key)?.displayOrder ?? 99;
+                return orderA - orderB;
+            });
+
+        return {
+            sections,
+            preamble: preambleLines.join("\n").trim(),
+            what: sections.find((section) => section.key === "what")?.answer || "",
+            why: sections.find((section) => section.key === "why")?.answer || ""
+        };
+    }
+
+    // Legacy unlabeled freeform: first paragraph/line = What, remainder = Why.
+    // Only used when no structured labels exist — does not invent Why here / Example / etc.
+    const paragraphs = normalized.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+    let what = "";
+    let why = "";
+    if (paragraphs.length >= 2) {
+        what = paragraphs[0];
+        why = paragraphs.slice(1).join("\n\n");
+    } else {
+        const plainLines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+        if (plainLines.length >= 2) {
+            what = plainLines[0];
+            why = plainLines.slice(1).join("\n");
+        } else {
+            what = normalized;
+        }
+    }
+
+    const sections = [];
+    if (what) {
+        sections.push({ key: "what", question: "What does this do?", answer: what });
+    }
+    if (why) {
+        sections.push({ key: "why", question: "Why is it used?", answer: why });
+    }
+
+    return { sections, preamble: "", what, why };
+}
+
+function renderGuideLearningSectionsMarkup(parsed) {
+    const blocks = [];
+    const preamble = String(parsed?.preamble || "").trim();
+    if (preamble) {
+        blocks.push(`
+            <div class="guide-detail-block guide-detail-block--preamble">
+                <div class="guide-detail-text">${escapeHtml(preamble)}</div>
+            </div>
+        `);
+    }
+
+    const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
+    for (const section of sections) {
+        const answer = String(section.answer || "").trim();
+        if (!answer) {
+            continue;
+        }
+        const monoClass = section.key === "example" ? " guide-detail-text--mono" : "";
+        blocks.push(`
+            <div class="guide-detail-block" data-guide-section="${escapeHtml(section.key)}">
+                <h4 class="guide-detail-label">${escapeHtml(section.question)}</h4>
+                <div class="guide-detail-text${monoClass}">${escapeHtml(answer)}</div>
+            </div>
+        `);
+    }
+
+    if (blocks.length === 0) {
+        return `
+            <div class="guide-detail-block">
+                <div class="guide-detail-text guide-detail-text--empty">No explanation added yet.</div>
+            </div>
+        `;
+    }
+
+    return blocks.join("");
+}
+
+function getGuideCardPreview(note) {
+    const plain = getGuidePlainDescription(note);
+    if (!plain) {
+        return { empty: true, text: "No explanation added yet.", truncated: false };
+    }
+
+    const parsed = parseGuideExplanation(plain);
+    const cardText = parsed.what
+        || parsed.sections.find((section) => section.key === "what")?.answer
+        || parsed.sections[0]?.answer
+        || parsed.preamble
+        || plain;
+    let text = cardText;
+    const hasMore = parsed.sections.length > 1
+        || Boolean(parsed.why)
+        || plain.length > guideCardPreviewMax
+        || cardText.length > guideCardPreviewMax;
+    let truncated = hasMore;
+
+    if (cardText.length > guideCardPreviewMax) {
+        text = `${cardText.slice(0, guideCardPreviewMax - 1).trimEnd()}\u2026`;
+        truncated = true;
+    }
+
+    return { empty: false, text, truncated };
+}
+
+function formatGuideLocationMarkup(details, { includeFileIcon = true } = {}) {
+    const fileName = details.filePath ? getFileBaseName(details.filePath) : "";
+    const rows = [];
+    if (fileName) {
+        rows.push(`<div class="guide-location-row guide-location-row--file">${includeFileIcon ? `<span aria-hidden="true">\uD83D\uDCC4</span> ` : ""}<span>${escapeHtml(fileName)}</span></div>`);
+    }
+    if (details.methodName) {
+        rows.push(`<div class="guide-location-row guide-location-row--nested"><span class="guide-location-nest" aria-hidden="true">\u21B3</span><span>${escapeHtml(details.methodName)}</span></div>`);
+    }
+    if (details.lineNumber) {
+        rows.push(`<div class="guide-location-row guide-location-row--nested"><span class="guide-location-nest" aria-hidden="true">\u21B3</span><span>Line ${escapeHtml(String(details.lineNumber))}</span></div>`);
+    }
+    return rows.length > 0 ? rows.join("") : `<div class="guide-location-row">No location</div>`;
+}
+
+function getGuideConceptBadge(note) {
+    const visual = getGuideConceptVisual(note);
+    const typeKey = getNoteTypeKey(note?.type);
+    const label = typeKey ? (NOTE_TYPE_META[typeKey]?.label || typeKey) : "Concept";
+    return {
+        icon: visual.icon,
+        label,
+        tone: visual.tone
+    };
+}
+
+function renderGuideAnnotationCard(note, index) {
+    const safeTitle = escapeHtml(note.title || "Untitled");
+    const preview = getGuideCardPreview(note);
+    const details = getCodeReferenceDetails(note);
+    const badge = getGuideConceptBadge(note);
+    const locationMarkup = formatGuideLocationMarkup(details);
+    const noteId = getNoteId(note);
+    const isSelected = Boolean(noteId) && noteId === selectedGuideNoteId;
+    const readMoreMarkup = preview.truncated
+        ? `<button type="button" class="guide-annotation__read-more" data-guide-open data-note-index="${index}">Read more</button>`
+        : "";
+
+    return `
+        <article class="guide-annotation guide-annotation--${badge.tone} note${isSelected ? " guide-annotation--selected" : ""}" data-note-index="${index}" data-note-id="${escapeHtml(noteId)}" role="button" tabindex="0" aria-label="Open annotation ${safeTitle}">
+            <div class="guide-annotation__top">
+                <span class="guide-concept-badge guide-concept-badge--${badge.tone}">
+                    <span class="guide-concept-badge__icon" aria-hidden="true">${badge.icon}</span>
+                    <span class="guide-concept-badge__label">${escapeHtml(badge.label)}</span>
+                </span>
+                <button type="button" class="guide-annotation__open" data-guide-open data-note-index="${index}">Open</button>
+            </div>
+            <h3 class="guide-annotation__title">${safeTitle}</h3>
+            <p class="guide-annotation__description${preview.empty ? " guide-annotation__description--empty" : ""}">${escapeHtml(preview.text)}</p>
+            ${readMoreMarkup}
+            <div class="guide-annotation__location">
+                ${locationMarkup}
+            </div>
+        </article>
+    `;
+}
+
+function noteMatchesGuideSearch(note, term) {
+    if (!term) {
+        return true;
+    }
+
+    const haystacks = [
+        note?.title,
+        stripHtml(note?.description || ""),
+        note?.filePath,
+        note?.methodName,
+        ...(Array.isArray(note?.tags) ? note.tags : [])
+    ];
+
+    return haystacks.some((value) => String(value || "").toLowerCase().includes(term));
+}
+
+function getGuideFilterState() {
+    return {
+        search: String(guideSearchInput?.value || "").trim().toLowerCase(),
+        file: String(guideFilterFile?.value || "all"),
+        concept: String(guideFilterConcept?.value || "all"),
+        tag: String(guideFilterTag?.value || "all")
+    };
+}
+
+function hasActiveGuideFilters() {
+    const state = getGuideFilterState();
+    return Boolean(state.search) || state.file !== "all" || state.concept !== "all" || state.tag !== "all";
+}
+
+function hasGuideSearchText() {
+    return Boolean(String(guideSearchInput?.value || "").trim());
+}
+
+function syncGuideSearchClearVisibility() {
+    guideSearchClearButton?.classList.toggle("hidden", !hasGuideSearchText());
+}
+
+function syncGuideClearFiltersVisibility() {
+    guideClearFiltersButton?.classList.toggle("hidden", !hasActiveGuideFilters());
+    syncGuideSearchClearVisibility();
+    syncGuideMoreFiltersVisibility();
+}
+
+function syncGuideMoreFiltersVisibility() {
+    const hasTags = Boolean(guideFilterTag && guideFilterTag.options.length > 1);
+    const tagActive = String(guideFilterTag?.value || "all") !== "all";
+    if (tagActive) {
+        guideMoreFiltersOpen = true;
+    }
+
+    if (guideMoreFiltersButton) {
+        guideMoreFiltersButton.hidden = !hasTags && !tagActive && !guideMoreFiltersOpen;
+        guideMoreFiltersButton.setAttribute("aria-expanded", String(guideMoreFiltersOpen));
+        guideMoreFiltersButton.textContent = guideMoreFiltersOpen ? "Fewer filters" : "More filters";
+    }
+
+    if (guideMoreFiltersPanel) {
+        guideMoreFiltersPanel.classList.toggle("hidden", !guideMoreFiltersOpen);
+    }
+}
+
+function setGuideMoreFiltersOpen(open) {
+    guideMoreFiltersOpen = Boolean(open);
+    syncGuideMoreFiltersVisibility();
+    persistGuideUiState();
+}
+
+function persistGuideUiState() {
+    try {
+        const payload = {
+            search: String(guideSearchInput?.value || ""),
+            file: String(guideFilterFile?.value || "all"),
+            concept: String(guideFilterConcept?.value || "all"),
+            tag: String(guideFilterTag?.value || "all"),
+            moreFiltersOpen: guideMoreFiltersOpen,
+            collapsedFiles: guideCollapsedFiles
+        };
+        sessionStorage.setItem(guideUiStateStorageKey, JSON.stringify(payload));
+    } catch {
+        // Ignore storage failures (private mode / quota).
+    }
+}
+
+function restoreGuideUiState() {
+    try {
+        const raw = sessionStorage.getItem(guideUiStateStorageKey);
+        if (!raw) {
+            return;
+        }
+
+        const payload = JSON.parse(raw);
+        if (!payload || typeof payload !== "object") {
+            return;
+        }
+
+        if (guideSearchInput && typeof payload.search === "string") {
+            guideSearchInput.value = payload.search;
+        }
+        if (guideFilterFile && typeof payload.file === "string") {
+            guideFilterFile.dataset.pendingValue = payload.file;
+        }
+        if (guideFilterConcept && typeof payload.concept === "string") {
+            guideFilterConcept.dataset.pendingValue = payload.concept;
+        }
+        if (guideFilterTag && typeof payload.tag === "string") {
+            guideFilterTag.dataset.pendingValue = payload.tag;
+        }
+        guideMoreFiltersOpen = Boolean(payload.moreFiltersOpen);
+        guideCollapsedFiles = payload.collapsedFiles && typeof payload.collapsedFiles === "object"
+            ? payload.collapsedFiles
+            : {};
+    } catch {
+        guideCollapsedFiles = {};
+    }
+}
+
+function applyPendingGuideFilterValues() {
+    const applyPending = (select) => {
+        if (!select) {
+            return;
+        }
+        const pending = select.dataset.pendingValue;
+        if (!pending) {
+            return;
+        }
+        const exists = Array.from(select.options).some((option) => option.value === pending);
+        select.value = exists ? pending : "all";
+        delete select.dataset.pendingValue;
+    };
+
+    applyPending(guideFilterFile);
+    applyPending(guideFilterConcept);
+    applyPending(guideFilterTag);
+}
+
+function clearGuideSearchOnly() {
+    if (!guideSearchInput) {
+        return false;
+    }
+
+    if (!hasGuideSearchText()) {
+        return false;
+    }
+
+    guideSearchInput.value = "";
+    syncGuideClearFiltersVisibility();
+    persistGuideUiState();
+    renderCodeGuide(true);
+    return true;
+}
+
+function clearGuideFilters() {
+    if (guideSearchInput) {
+        guideSearchInput.value = "";
+    }
+    if (guideFilterFile) {
+        guideFilterFile.value = "all";
+    }
+    if (guideFilterConcept) {
+        guideFilterConcept.value = "all";
+    }
+    if (guideFilterTag) {
+        guideFilterTag.value = "all";
+    }
+    syncGuideClearFiltersVisibility();
+    persistGuideUiState();
+    renderCodeGuide(true);
+}
+
+function formatGuideFileFilterLabel(filePath) {
+    const normalized = normalizeGuidePath(filePath);
+    if (!normalized) {
+        return "Unknown file";
+    }
+
+    return normalized;
+}
+
+function updateGuideFilterOptions(sourceNotes) {
+    const previousFile = String(guideFilterFile?.dataset.pendingValue || guideFilterFile?.value || "all");
+    const previousConcept = String(guideFilterConcept?.dataset.pendingValue || guideFilterConcept?.value || "all");
+    const previousTag = String(guideFilterTag?.dataset.pendingValue || guideFilterTag?.value || "all");
+
+    const files = Array.from(new Set(
+        sourceNotes
+            .map((note) => normalizeGuidePath(getCodeReferenceDetails(note).filePath))
+            .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+    const concepts = Array.from(new Set(
+        sourceNotes.map((note) => getGuideConceptKey(note)).filter((value) => value && value !== "untagged")
+    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+    const tags = Array.from(new Set(
+        sourceNotes.flatMap((note) => Array.isArray(note.tags) ? note.tags.map((tag) => String(tag || "").trim()).filter(Boolean) : [])
+    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+    if (guideFilterFile) {
+        guideFilterFile.innerHTML = "";
+        const allFiles = document.createElement("option");
+        allFiles.value = "all";
+        allFiles.textContent = "All files";
+        guideFilterFile.append(allFiles);
+        for (const file of files) {
+            const option = document.createElement("option");
+            option.value = file;
+            option.textContent = formatGuideFileFilterLabel(file);
+            option.title = file;
+            guideFilterFile.append(option);
+        }
+        guideFilterFile.value = files.includes(previousFile) ? previousFile : "all";
+        delete guideFilterFile.dataset.pendingValue;
+    }
+
+    if (guideFilterConcept) {
+        const known = new Set(["bug", "idea", "task", "code"]);
+        guideFilterConcept.innerHTML = "";
+        const allConcepts = document.createElement("option");
+        allConcepts.value = "all";
+        allConcepts.textContent = "All concepts";
+        guideFilterConcept.append(allConcepts);
+        for (const concept of ["code", "bug", "idea", "task"]) {
+            const option = document.createElement("option");
+            option.value = concept;
+            option.textContent = formatTypeLabel(concept) || concept;
+            guideFilterConcept.append(option);
+        }
+        for (const concept of concepts) {
+            if (known.has(concept)) {
+                continue;
+            }
+            const option = document.createElement("option");
+            option.value = concept;
+            option.textContent = concept;
+            guideFilterConcept.append(option);
+        }
+        const conceptValues = Array.from(guideFilterConcept.options).map((option) => option.value);
+        guideFilterConcept.value = conceptValues.includes(previousConcept) ? previousConcept : "all";
+        delete guideFilterConcept.dataset.pendingValue;
+    }
+
+    if (guideFilterTag) {
+        guideFilterTag.innerHTML = "";
+        const allTags = document.createElement("option");
+        allTags.value = "all";
+        allTags.textContent = "All tags";
+        guideFilterTag.append(allTags);
+        for (const tag of tags) {
+            const option = document.createElement("option");
+            option.value = tag;
+            option.textContent = `#${tag}`;
+            guideFilterTag.append(option);
+        }
+        guideFilterTag.value = tags.includes(previousTag) ? previousTag : "all";
+        delete guideFilterTag.dataset.pendingValue;
+    }
+
+    syncGuideClearFiltersVisibility();
+}
+
+function getFilteredGuideNotes() {
+    const state = getGuideFilterState();
+    return codeGuideSourceNotes.filter((note) => {
+        if (!isCodeGuideAnnotation(note)) {
+            return false;
+        }
+
+        if (!noteMatchesGuideSearch(note, state.search)) {
+            return false;
+        }
+
+        const filePath = normalizeGuidePath(getCodeReferenceDetails(note).filePath);
+        if (state.file !== "all" && filePath !== state.file) {
+            return false;
+        }
+
+        if (state.concept !== "all" && getGuideConceptKey(note) !== state.concept) {
+            return false;
+        }
+
+        if (state.tag !== "all") {
+            const tags = Array.isArray(note.tags)
+                ? note.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+                : [];
+            if (!tags.some((tag) => tag.toLowerCase() === state.tag.toLowerCase())) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+}
+
+async function fetchAllNotesForGuide(signal) {
+    const items = [];
+    let page = 1;
+    let total = Number.POSITIVE_INFINITY;
+
+    while (items.length < total && page <= 50) {
+        const query = new URLSearchParams({
+            page: String(page),
+            pageSize: String(guideFetchPageSize),
+            search: "",
+            type: "all",
+            sort: "oldest"
+        });
+        const response = await apiRequest(`/devnotes/api?${query.toString()}`, { signal });
+        const batch = Array.isArray(response)
+            ? response
+            : (Array.isArray(response?.items) ? response.items : []);
+        total = Array.isArray(response)
+            ? batch.length
+            : (Number.isFinite(response?.total) ? response.total : batch.length);
+        items.push(...batch);
+        if (batch.length === 0 || items.length >= total) {
+            break;
+        }
+
+        page += 1;
+    }
+
+    return items;
+}
+
+/**
+ * @param {{ soft?: boolean }} [options]
+ */
+async function loadCodeGuideNotes(options = {}) {
+    const soft = Boolean(options.soft) && codeGuideSurfaceReady;
+    const fetchId = ++activeGuideFetchId;
+
+    guideFetchController?.abort();
+    const fetchController = new AbortController();
+    guideFetchController = fetchController;
+
+    setLoadingState(true, { soft });
+    if (!soft) {
+        setStatus("Loading Code Guide...");
+    }
+
+    try {
+        const items = await fetchAllNotesForGuide(fetchController.signal);
+        if (fetchId !== activeGuideFetchId) {
+            return;
+        }
+
+        codeGuideSourceNotes = items.filter((note) => isCodeGuideAnnotation(note));
+        updateGuideFilterOptions(codeGuideSourceNotes);
+        applyPendingGuideFilterValues();
+        renderCodeGuide(true);
+        setStatus("");
+        codeGuideSurfaceReady = true;
+    } catch (error) {
+        if (fetchId !== activeGuideFetchId) {
+            return;
+        }
+
+        if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+        }
+
+        const message = error instanceof Error ? error.message : "Failed to load Code Guide.";
+        notesContainer.innerHTML = `<p class="notes-empty">${escapeHtml(message)}</p>`;
+        if (guideSummaryElement) {
+            guideSummaryElement.textContent = "";
+        }
+        setStatus(message, true);
+    } finally {
+        if (fetchId === activeGuideFetchId) {
+            setLoadingState(false, { soft });
+            if (guideFetchController === fetchController) {
+                guideFetchController = null;
+            }
+        }
+    }
+}
+
+function isGuideFileCollapsed(filePath) {
+    return Boolean(guideCollapsedFiles[normalizeGuidePath(filePath)]);
+}
+
+function setGuideFileCollapsed(filePath, collapsed) {
+    const key = normalizeGuidePath(filePath);
+    if (!key) {
+        return;
+    }
+
+    if (collapsed) {
+        guideCollapsedFiles[key] = true;
+    } else {
+        delete guideCollapsedFiles[key];
+    }
+    persistGuideUiState();
+}
+
+function toggleGuideFileGroup(filePath) {
+    const key = normalizeGuidePath(filePath);
+    setGuideFileCollapsed(key, !isGuideFileCollapsed(key));
+    const groups = notesContainer.querySelectorAll("[data-guide-file]");
+    let group = null;
+    for (const candidate of groups) {
+        if (candidate instanceof HTMLElement && normalizeGuidePath(candidate.dataset.guideFile || "") === key) {
+            group = candidate;
+            break;
+        }
+    }
+    if (!(group instanceof HTMLElement)) {
+        renderCodeGuide(true);
+        return;
+    }
+
+    const collapsed = isGuideFileCollapsed(key);
+    group.classList.toggle("guide-file-group--collapsed", collapsed);
+    const toggle = group.querySelector("[data-guide-toggle]");
+    if (toggle instanceof HTMLElement) {
+        toggle.setAttribute("aria-expanded", String(!collapsed));
+    }
+}
+
+function renderCodeGuide(force = false) {
+    const filtered = getFilteredGuideNotes();
+    const state = getGuideFilterState();
+    renderedNotes = filtered;
+
+    const signature = [
+        state.search,
+        state.file,
+        state.concept,
+        state.tag,
+        JSON.stringify(guideCollapsedFiles),
+        filtered.map((note) => {
+            const details = getCodeReferenceDetails(note);
+            return `${getNoteId(note)}:${details.filePath}:${details.lineNumber}:${note.title}:${note.description}:${(note.tags || []).join(",")}`;
+        }).join("|")
+    ].join("::");
+    if (!force && signature === lastGuideRenderSignature) {
+        updateGuideSummary(filtered);
+        return;
+    }
+    lastGuideRenderSignature = signature;
+
+    if (filtered.length === 0) {
+        const hasFilters = hasActiveGuideFilters();
+        const fileOnlyEmpty = state.file !== "all" && !state.search && state.concept === "all" && state.tag === "all";
+        notesContainer.innerHTML = fileOnlyEmpty
+            ? `
+                <div class="notes-empty notes-empty-state guide-empty-state">
+                    <p class="notes-empty-state__title">No Code Guide annotations found for this file.</p>
+                    <button type="button" class="empty-state-action" data-guide-clear-filters>Clear filters</button>
+                </div>
+            `
+            : hasFilters
+            ? `
+                <div class="notes-empty notes-empty-state guide-empty-state">
+                    <p class="notes-empty-state__title">No code annotations found.</p>
+                    <p class="notes-empty-state__subtitle">Try:</p>
+                    <ul class="guide-empty-hints">
+                        <li>another concept (e.g. Dependency Injection)</li>
+                        <li>a filename (e.g. Program.cs)</li>
+                        <li>a method name</li>
+                        <li>a tag</li>
+                    </ul>
+                    <button type="button" class="empty-state-action" data-guide-clear-filters>Clear filters</button>
+                </div>
+            `
+            : `
+                <div class="notes-empty notes-empty-state guide-empty-state">
+                    <p class="notes-empty-state__title">No code annotations yet</p>
+                    <p class="notes-empty-state__subtitle">Add learning notes in source, then scan:</p>
+                    <ul class="guide-empty-hints">
+                        <li><code>// DEVNOTE: Dependency Injection</code></li>
+                        <li><code>// Registers services into the DI container.</code></li>
+                    </ul>
+                    <p class="guide-empty-hint-extra">Then use <strong>Scan Project</strong> and import into Code Guide.</p>
+                    <button type="button" class="empty-state-action" data-guide-help>How to annotate</button>
+                </div>
+            `;
+        updateGuideSummary(filtered);
+        persistGuideUiState();
+        return;
+    }
+
+    const groups = new Map();
+    filtered.forEach((note, index) => {
+        const filePath = normalizeGuidePath(getCodeReferenceDetails(note).filePath) || "Unknown file";
+        if (!groups.has(filePath)) {
+            groups.set(filePath, []);
+        }
+        groups.get(filePath).push({ note, index });
+    });
+
+    // Code Guide only: preserve physical source order (line ascending).
+    // Do not sort by created/updated date, title, or author.
+    for (const items of groups.values()) {
+        items.sort(compareGuideAnnotationsBySourceOrder);
+    }
+
+    const sortedGroups = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }));
+    const usingSearch = Boolean(state.search);
+
+    notesContainer.innerHTML = sortedGroups.map(([filePath, items]) => {
+        const fileName = getFileBaseName(filePath);
+        const folderPath = filePath.includes("/") ? filePath : "";
+        const countLabel = usingSearch
+            ? (items.length === 1 ? "1 result" : `${items.length} results`)
+            : (items.length === 1 ? "1 annotation" : `${items.length} annotations`);
+        const collapsed = isGuideFileCollapsed(filePath);
+        const codeMap = renderCodeMap(filePath, items);
+        const cards = items.map((item) => renderGuideAnnotationCard(item.note, item.index)).join("");
+        return `
+            <section class="guide-file-group${collapsed ? " guide-file-group--collapsed" : ""}" data-guide-file="${escapeHtml(filePath)}">
+                <button type="button" class="guide-file-group__header" data-guide-toggle aria-expanded="${collapsed ? "false" : "true"}">
+                    <span class="guide-file-group__chevron" aria-hidden="true"></span>
+                    <span class="guide-file-group__heading">
+                        <span class="guide-file-group__title">
+                            <span class="guide-file-group__icon" aria-hidden="true">\uD83D\uDCC4</span>
+                            <span class="guide-file-group__name">${escapeHtml(fileName)}</span>
+                        </span>
+                        ${folderPath && folderPath !== fileName
+                            ? `<span class="guide-file-group__path">${escapeHtml(folderPath)}</span>`
+                            : ""}
+                    </span>
+                    <span class="guide-file-group__count">${countLabel}</span>
+                </button>
+                <div class="guide-file-group__body">
+                    ${codeMap}
+                    <div class="guide-file-group__list">
+                        ${cards}
+                    </div>
+                </div>
+            </section>
+        `;
+    }).join("");
+
+    updateGuideSelectionHighlights();
+    updateGuideSummary(filtered);
+    persistGuideUiState();
+}
+
+/**
+ * Flat table-of-contents for a file's DEVNOTE annotations (source order).
+ * Does not create records — indexes existing DevNote items only.
+ * @param {string} filePath
+ * @param {Array<{ note: object, index: number }>} items Already sorted by LineNumber ASC.
+ */
+function renderCodeMap(filePath, items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        // Never show an empty Code Map.
+        return "";
+    }
+
+    const fileName = getFileBaseName(filePath) || "File";
+    const rows = items.map((item, mapIndex) => {
+        const note = item.note;
+        const noteId = getNoteId(note);
+        const title = note?.title || "Untitled";
+        const line = getGuideSourceLineNumber(note);
+        const isActive = Boolean(noteId) && noteId === selectedGuideNoteId;
+        const lineMarkup = line > 0
+            ? `<span class="code-map-item__leader" aria-hidden="true"></span><span class="code-map-item__line">Line ${escapeHtml(String(line))}</span>`
+            : "";
+
+        return `
+            <button
+                type="button"
+                class="code-map-item${isActive ? " code-map-item--active" : ""}"
+                data-code-map-item
+                data-note-id="${escapeHtml(noteId)}"
+                data-note-index="${item.index}"
+                role="listitem"
+                aria-current="${isActive ? "true" : "false"}"
+            >
+                <span class="code-map-item__index">${formatCodeMapIndex(mapIndex)}</span>
+                <span class="code-map-item__title">${escapeHtml(title)}</span>
+                ${lineMarkup}
+            </button>
+        `;
+    }).join("");
+
+    return `
+        <nav class="code-map" aria-label="Code map for ${escapeHtml(fileName)}">
+            <div class="code-map__header">
+                <h3 class="code-map__heading">Code Map</h3>
+            </div>
+            <div class="code-map__list" role="list">
+                ${rows}
+            </div>
+        </nav>
+    `;
+}
+
+function formatCodeMapIndex(zeroBasedIndex) {
+    return String(Number(zeroBasedIndex) + 1).padStart(2, "0");
+}
+
+function updateGuideSelectionHighlights() {
+    if (!notesContainer) {
+        return;
+    }
+
+    const selectedId = selectedGuideNoteId || "";
+
+    notesContainer.querySelectorAll(".code-map-item").forEach((el) => {
+        if (!(el instanceof HTMLElement)) {
+            return;
+        }
+        const isActive = Boolean(selectedId) && el.dataset.noteId === selectedId;
+        el.classList.toggle("code-map-item--active", isActive);
+        el.setAttribute("aria-current", isActive ? "true" : "false");
+    });
+
+    notesContainer.querySelectorAll(".guide-annotation[data-note-index]").forEach((el) => {
+        if (!(el instanceof HTMLElement)) {
+            return;
+        }
+        const note = getRenderedNote(el.dataset.noteIndex);
+        const isSelected = Boolean(selectedId) && getNoteId(note) === selectedId;
+        el.classList.toggle("guide-annotation--selected", isSelected);
+    });
+}
+
+function scrollGuideAnnotationIntoView(note) {
+    if (!notesContainer || !note) {
+        return;
+    }
+
+    const noteId = getNoteId(note);
+    const index = renderedNotes.findIndex((candidate) => getNoteId(candidate) === noteId);
+    if (index < 0) {
+        return;
+    }
+
+    const card = notesContainer.querySelector(`.guide-annotation[data-note-index="${index}"]`);
+    if (!(card instanceof HTMLElement)) {
+        return;
+    }
+
+    const group = card.closest("[data-guide-file]");
+    if (group instanceof HTMLElement && group.classList.contains("guide-file-group--collapsed")) {
+        const filePath = group.dataset.guideFile || "";
+        if (filePath) {
+            setGuideFileCollapsed(filePath, false);
+            renderCodeGuide(true);
+            const expandedCard = notesContainer.querySelector(`.guide-annotation[data-note-index="${index}"]`);
+            expandedCard?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            updateGuideSelectionHighlights();
+            return;
+        }
+    }
+
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/**
+ * Select a Code Guide annotation from the Code Map: highlight, scroll list, open detail.
+ * @param {object} note
+ */
+function selectGuideAnnotationFromMap(note) {
+    if (!note) {
+        return;
+    }
+
+    selectedGuideNoteId = getNoteId(note);
+    updateGuideSelectionHighlights();
+    scrollGuideAnnotationIntoView(note);
+    openModal(note);
+}
+
+/**
+ * Sort key for Code Guide: LineNumber ascending, missing lines last,
+ * then scanner/discovery order (stable index) for equal lines.
+ * @param {{ note: object, index: number }} a
+ * @param {{ note: object, index: number }} b
+ */
+function compareGuideAnnotationsBySourceOrder(a, b) {
+    const lineA = getGuideSourceLineNumber(a.note);
+    const lineB = getGuideSourceLineNumber(b.note);
+    const hasLineA = lineA > 0;
+    const hasLineB = lineB > 0;
+
+    if (hasLineA && hasLineB && lineA !== lineB) {
+        return lineA - lineB;
+    }
+    if (hasLineA && !hasLineB) {
+        return -1;
+    }
+    if (!hasLineA && hasLineB) {
+        return 1;
+    }
+
+    // Same line (or both missing): keep discovery / list order.
+    return a.index - b.index;
+}
+
+function getGuideSourceLineNumber(note) {
+    const raw = getCodeReferenceDetails(note).lineNumber;
+    const value = Number(raw);
+    return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+function updateGuideSummary(filteredNotes) {
+    if (!guideSummaryElement) {
+        return;
+    }
+
+    const fileCount = new Set(
+        filteredNotes.map((note) => normalizeGuidePath(getCodeReferenceDetails(note).filePath)).filter(Boolean)
+    ).size;
+    const annotationLabel = filteredNotes.length === 1 ? "1 annotation" : `${filteredNotes.length} annotations`;
+    const fileLabel = fileCount === 1 ? "1 file" : `${fileCount} files`;
+    const text = `${annotationLabel} \u00B7 ${fileLabel}`;
+    if (text === lastGuideSummaryText) {
+        return;
+    }
+
+    lastGuideSummaryText = text;
+    guideSummaryElement.textContent = text;
+}
+
+const debouncedGuideSearch = debounce(() => {
+    persistGuideUiState();
+    renderCodeGuide(true);
+}, searchDebounceMs);
+
 noteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -681,6 +1888,12 @@ noteForm.addEventListener("submit", async (event) => {
     const lineNumber = Number.isFinite(parsedLineNumber) && parsedLineNumber > 0 ? parsedLineNumber : null;
     const isEditing = Boolean(editingNoteId);
     const successMessage = isEditing ? "Note updated." : "Note added.";
+
+    if (isCodeGuideMode() && !codeFilePath) {
+        setStatus("Tip: set a code file path so this annotation appears in Code Guide.", true);
+        codeFilePathInput?.focus();
+        return;
+    }
 
     submitButton.disabled = true;
     cancelEditButton?.setAttribute("disabled", "true");
@@ -739,9 +1952,9 @@ noteForm.addEventListener("submit", async (event) => {
         closeComposerModal();
 
         try {
-            await loadNotes({ soft: false });
+            await refreshActiveDashboard({ soft: false });
         } catch {
-            // loadNotes handles its own status/error UI; avoid treating reload as save failure.
+            // Active dashboard loader handles its own status/error UI; avoid treating reload as save failure.
         }
 
         void loadStatistics();
@@ -853,6 +2066,54 @@ notesContainer.addEventListener("click", (event) => {
         return;
     }
 
+    const guideToggle = event.target.closest("[data-guide-toggle]");
+    if (guideToggle instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const group = guideToggle.closest("[data-guide-file]");
+        const filePath = group instanceof HTMLElement ? group.dataset.guideFile || "" : "";
+        if (filePath) {
+            toggleGuideFileGroup(filePath);
+        }
+        return;
+    }
+
+    const codeMapItem = event.target.closest("[data-code-map-item]");
+    if (codeMapItem instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const note = getRenderedNote(codeMapItem.dataset.noteIndex);
+        if (note) {
+            selectGuideAnnotationFromMap(note);
+        }
+        return;
+    }
+
+    const guideOpenButton = event.target.closest("[data-guide-open]");
+    if (guideOpenButton instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const note = getRenderedNote(guideOpenButton.dataset.noteIndex);
+        if (note) {
+            openModal(note);
+        }
+        return;
+    }
+
+    const guideClearFiltersAction = event.target.closest("[data-guide-clear-filters]");
+    if (guideClearFiltersAction instanceof HTMLElement) {
+        event.preventDefault();
+        clearGuideFilters();
+        return;
+    }
+
+    const guideHelpAction = event.target.closest("[data-guide-help]");
+    if (guideHelpAction instanceof HTMLElement) {
+        event.preventDefault();
+        openGuideHelpModal();
+        return;
+    }
+
     if (event.target.closest("a[data-attachment-link]")) {
         return;
     }
@@ -946,8 +2207,9 @@ function handleGlobalShortcuts(event) {
     if (isSearchShortcut && !isTyping) {
         event.preventDefault();
         event.stopPropagation();
-        searchInput?.focus();
-        searchInput?.select();
+        const targetSearch = isCodeGuideMode() ? guideSearchInput : searchInput;
+        targetSearch?.focus();
+        targetSearch?.select();
         return;
     }
 }
@@ -975,13 +2237,30 @@ document.addEventListener("keydown", (event) => {
         return;
     }
 
+    if (event.key === "Escape" && isGuideHelpModalOpen()) {
+        closeGuideHelpModal();
+        return;
+    }
+
     if (event.key === "Escape" && isImportModalOpen()) {
         closeImportModal();
         return;
     }
 
+    if (event.key === "Escape" && isCodeGuideExportModalOpen()) {
+        closeCodeGuideExportModal();
+        return;
+    }
+
     if (event.key === "Escape" && isComposerModalOpen()) {
         closeComposerModal();
+        return;
+    }
+
+    if (event.key === "Escape" && isCodeGuideMode() && hasGuideSearchText()) {
+        event.preventDefault();
+        clearGuideSearchOnly();
+        guideSearchInput?.focus();
     }
 });
 
@@ -1001,6 +2280,93 @@ addNoteButton?.addEventListener("click", () => {
     openComposerForCreate();
 });
 
+codeGuideAddNoteButton?.addEventListener("click", () => {
+    openComposerForCreate();
+});
+
+codeGuideHelpButton?.addEventListener("click", () => {
+    openGuideHelpModal();
+});
+
+guideHelpCloseButton?.addEventListener("click", () => {
+    closeGuideHelpModal();
+});
+
+guideHelpCloseActionButton?.addEventListener("click", () => {
+    closeGuideHelpModal();
+});
+
+guideHelpScanButton?.addEventListener("click", () => {
+    closeGuideHelpModal();
+    scanProjectButton?.click();
+});
+
+guideHelpModal?.addEventListener("click", (event) => {
+    const clickTarget = event.target;
+    if (!(clickTarget instanceof Element)) {
+        return;
+    }
+
+    if (!clickTarget.closest(".guide-help-modal")) {
+        closeGuideHelpModal();
+    }
+});
+
+modeNotesBtn?.addEventListener("click", () => {
+    setDashboardMode(MODE_NOTES);
+});
+
+modeCodeGuideBtn?.addEventListener("click", () => {
+    setDashboardMode(MODE_CODE_GUIDE);
+});
+
+guideSearchInput?.addEventListener("input", () => {
+    syncGuideClearFiltersVisibility();
+    debouncedGuideSearch();
+});
+
+guideSearchClearButton?.addEventListener("click", () => {
+    if (clearGuideSearchOnly()) {
+        guideSearchInput?.focus();
+    }
+});
+
+guideFilterFile?.addEventListener("change", () => {
+    syncGuideClearFiltersVisibility();
+    persistGuideUiState();
+    renderCodeGuide(true);
+});
+
+guideFilterConcept?.addEventListener("change", () => {
+    syncGuideClearFiltersVisibility();
+    persistGuideUiState();
+    renderCodeGuide(true);
+});
+
+guideFilterTag?.addEventListener("change", () => {
+    syncGuideClearFiltersVisibility();
+    persistGuideUiState();
+    renderCodeGuide(true);
+});
+
+guideClearFiltersButton?.addEventListener("click", () => {
+    clearGuideFilters();
+});
+
+guideMoreFiltersButton?.addEventListener("click", () => {
+    setGuideMoreFiltersOpen(!guideMoreFiltersOpen);
+});
+
+modalEditButton?.addEventListener("click", () => {
+    if (activeModalNote) {
+        startEditingNote(activeModalNote);
+    }
+});
+
+modalCloseActionButton?.addEventListener("click", () => {
+    closeModal();
+});
+
 quickAddNoteFab?.addEventListener("click", () => {
     openComposerForCreate();
 });
@@ -1011,6 +2377,9 @@ window.addEventListener("scroll", () => {
 
 function openComposerForCreate() {
     openComposerModal();
+    if (isCodeGuideMode() && typeInput && !String(typeInput.value || "").trim()) {
+        typeInput.value = "code";
+    }
 }
 
 function syncQuickAddFabVisibility() {
@@ -1221,7 +2590,7 @@ function updateUserFilterOptions() {
 
 function renderNoteCard(note, index) {
     const safeTitle = escapeHtml(note.title || "Untitled");
-    const safeDescription = sanitizeDescriptionHtml(note.description || "");
+    const safeDescription = formatNoteDescriptionHtml(note.description || "");
     const hasDescription = Boolean(stripHtml(safeDescription).trim());
     const descriptionMarkup = hasDescription
         ? `<div class="note__description-wrap"><div class="note-description note-description--preview">${safeDescription}</div></div>`
@@ -1350,7 +2719,7 @@ function startEditingNote(note) {
     editingNoteId = noteId;
     titleInput.value = note.title || "";
     if (descriptionEditor) {
-        descriptionEditor.innerHTML = sanitizeDescriptionHtml(note.description || "");
+        descriptionEditor.innerHTML = formatNoteDescriptionHtml(note.description || "");
     }
     typeInput.value = note.type || "";
     tagsInput.value = Array.isArray(note.tags) ? note.tags.join(", ") : "";
@@ -1400,7 +2769,7 @@ async function deleteNote(note) {
         }
 
         closeModal();
-        await loadNotes({ soft: false });
+        await refreshActiveDashboard({ soft: false });
         void loadStatistics();
         setStatus("Note deleted.");
     } catch (error) {
@@ -1545,6 +2914,23 @@ function escapeHtml(value) {
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;");
+}
+
+function looksLikeHtmlDescription(value) {
+    return /<\/?[a-z][\s\S]*>/i.test(String(value || ""));
+}
+
+function formatNoteDescriptionHtml(description) {
+    const raw = String(description || "");
+    if (!raw.trim()) {
+        return "";
+    }
+
+    if (looksLikeHtmlDescription(raw)) {
+        return sanitizeDescriptionHtml(raw);
+    }
+
+    return escapeHtml(raw).replace(/\r\n|\r|\n/g, "<br>");
 }
 
 function sanitizeDescriptionHtml(inputHtml) {
@@ -1756,74 +3142,175 @@ function openModal(note) {
         return;
     }
 
+    const asGuide = isCodeGuideMode();
+    guideModalPresentation = asGuide;
+    noteModal.classList.toggle("note-modal--code-guide", asGuide);
+
+    if (asGuide) {
+        selectedGuideNoteId = getNoteId(note);
+        updateGuideSelectionHighlights();
+    }
+
     const title = note.title || "Untitled";
     const type = formatTypeLabel(note.type) || "N/A";
     const tags = Array.isArray(note.tags) && note.tags.length > 0
         ? note.tags.map((tag) => `#${String(tag).trim()}`).join(" ")
-        : "N/A";
+        : (asGuide ? "" : "N/A");
     const createdBy = formatUserDisplayName(getCreatedByForDisplay(note.createdBy));
     const createdAtRelative = note.createdAt ? formatRelativeTime(note.createdAt) : "N/A";
     const createdAtExact = note.createdAt ? formatExactDateTime(note.createdAt) : "";
 
     lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modalTitle.textContent = title;
-    const modalDescriptionHtml = sanitizeDescriptionHtml(note.description || "");
-    const hasModalDescription = Boolean(stripHtml(modalDescriptionHtml).trim());
-    modalDescription.innerHTML = hasModalDescription ? modalDescriptionHtml : "";
-    modalDescription.closest(".modal-section--description")?.classList.toggle("hidden", !hasModalDescription);
     activeModalNote = note;
-    const codeReference = getCodeReferenceDetails(note);
-    const hasCodeReference = Boolean(codeReference.filePath || codeReference.methodName || codeReference.lineNumber);
-    if (modalCodeReferenceSection && modalCodeFile && modalCodeMethod && modalCodeLine) {
-        modalCodeReferenceSection.classList.toggle("hidden", !hasCodeReference);
-        if (codeReference.filePath) {
-            const fileName = getFileBaseName(codeReference.filePath);
-            modalCodeFile.innerHTML = `<span class="modal-code-reference__icon" aria-hidden="true">\uD83D\uDCC4</span> <strong>${escapeHtml(fileName)}</strong>`;
-        } else {
-            modalCodeFile.innerHTML = "";
+
+    for (const section of notesOnlyModalSections) {
+        if (section instanceof HTMLElement) {
+            section.classList.toggle("hidden", asGuide);
+        }
+    }
+    modalGuideLearning?.classList.toggle("hidden", !asGuide);
+
+    if (asGuide) {
+        const plain = getGuidePlainDescription(note);
+        const parsed = parseGuideExplanation(plain);
+        const details = getCodeReferenceDetails(note);
+
+        if (modalGuideSections) {
+            modalGuideSections.innerHTML = renderGuideLearningSectionsMarkup(parsed);
+        }
+        if (modalGuideWhere) {
+            // Location already shows file + method + line; avoid duplicating Method below.
+            modalGuideWhere.innerHTML = formatGuideLocationMarkup(details);
+        }
+        if (modalGuideMethodBlock) {
+            modalGuideMethodBlock.classList.add("hidden");
+        }
+        if (modalGuideTagsBlock && modalGuideTags) {
+            const tagList = Array.isArray(note.tags)
+                ? note.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+                : [];
+            modalGuideTagsBlock.classList.toggle("hidden", tagList.length === 0);
+            modalGuideTags.innerHTML = tagList
+                .map((tag) => `<span class="guide-tag">${escapeHtml(tag)}</span>`)
+                .join("");
+        }
+        if (modalGuideSecondaryType) {
+            modalGuideSecondaryType.textContent = `Type: ${type}`;
+        }
+        if (modalGuideSecondaryCreatedBy) {
+            modalGuideSecondaryCreatedBy.textContent = `Created by ${createdBy}`;
+        }
+        if (modalGuideSecondaryCreated) {
+            modalGuideSecondaryCreated.textContent = createdAtRelative === "N/A"
+                ? "Created: Unknown"
+                : `Created ${createdAtRelative}`;
+            if (note.createdAt) {
+                modalGuideSecondaryCreated.setAttribute("title", createdAtExact);
+            } else {
+                modalGuideSecondaryCreated.removeAttribute("title");
+            }
+        }
+        if (modalGuideSecondary instanceof HTMLDetailsElement) {
+            modalGuideSecondary.open = false;
         }
 
-        modalCodeMethod.textContent = codeReference.methodName
-            ? `${codeReference.methodName}()`
-            : "";
-        modalCodeLine.textContent = codeReference.lineNumber
-            ? `Line ${codeReference.lineNumber}`
-            : "";
-    }
-
-    if (modalViewCodeButton) {
-        const canViewCode = Boolean(codeReference.filePath);
-        modalViewCodeButton.classList.toggle("hidden", !canViewCode);
-        modalViewCodeButton.disabled = !canViewCode;
-    }
-
-    const hasAttachment = getAttachmentPaths(note).length > 0;
-    const attachmentMarkup = hasAttachment ? getAttachmentMarkup(note, "modal") : "";
-    modalAttachment.innerHTML = attachmentMarkup;
-    if (modalAttachmentsSection) {
-        modalAttachmentsSection.classList.toggle("hidden", !hasAttachment);
-    }
-    modalType.textContent = type;
-    modalTags.textContent = tags;
-    modalCreatedBy.textContent = `Created by ${createdBy}`;
-    modalCreated.textContent = createdAtRelative;
-    if (note.createdAt) {
-        modalCreated.setAttribute("title", createdAtExact);
-        modalCreated.setAttribute("datetime", note.createdAt);
+        // Keep View Code available in guide mode via a small action near location if needed.
+        if (modalViewCodeButton && modalGuideWhereBlock) {
+            const canViewCode = Boolean(details.filePath);
+            if (canViewCode) {
+                modalViewCodeButton.classList.remove("hidden");
+                modalViewCodeButton.disabled = false;
+                if (!modalGuideWhereBlock.contains(modalViewCodeButton)) {
+                    modalGuideWhereBlock.append(modalViewCodeButton);
+                }
+            } else {
+                modalViewCodeButton.classList.add("hidden");
+                modalViewCodeButton.disabled = true;
+            }
+        }
     } else {
-        modalCreated.removeAttribute("title");
-        modalCreated.removeAttribute("datetime");
+        if (modalDescriptionTitle) {
+            modalDescriptionTitle.textContent = "Description";
+        }
+        if (modalMetadataTitle) {
+            modalMetadataTitle.textContent = "Metadata";
+        }
+        if (modalCodeReferenceTitle) {
+            modalCodeReferenceTitle.textContent = "Code Reference";
+        }
+
+        const modalDescriptionHtml = formatNoteDescriptionHtml(note.description || "");
+        const hasModalDescription = Boolean(stripHtml(modalDescriptionHtml).trim());
+        modalDescription.innerHTML = hasModalDescription ? modalDescriptionHtml : "";
+        modalDescription.closest(".modal-section--description")?.classList.toggle("hidden", !hasModalDescription);
+
+        const codeReference = getCodeReferenceDetails(note);
+        const hasCodeReference = Boolean(codeReference.filePath || codeReference.methodName || codeReference.lineNumber);
+        if (modalCodeReferenceSection && modalCodeFile && modalCodeMethod && modalCodeLine) {
+            modalCodeReferenceSection.classList.toggle("hidden", !hasCodeReference);
+            if (codeReference.filePath) {
+                const fileName = getFileBaseName(codeReference.filePath);
+                modalCodeFile.innerHTML = `<span class="modal-code-reference__icon" aria-hidden="true">\uD83D\uDCC4</span> <strong>${escapeHtml(fileName)}</strong>`;
+            } else {
+                modalCodeFile.innerHTML = "";
+            }
+
+            modalCodeMethod.textContent = codeReference.methodName
+                ? `${codeReference.methodName}()`
+                : "";
+            modalCodeLine.textContent = codeReference.lineNumber
+                ? `Line ${codeReference.lineNumber}`
+                : "";
+        }
+
+        if (modalViewCodeButton) {
+            const codeRefSection = document.getElementById("modal-code-reference");
+            if (codeRefSection && !codeRefSection.contains(modalViewCodeButton)) {
+                codeRefSection.append(modalViewCodeButton);
+            }
+            const canViewCode = Boolean(codeReference.filePath);
+            modalViewCodeButton.classList.toggle("hidden", !canViewCode);
+            modalViewCodeButton.disabled = !canViewCode;
+        }
+
+        const hasAttachment = getAttachmentPaths(note).length > 0;
+        const attachmentMarkup = hasAttachment ? getAttachmentMarkup(note, "modal") : "";
+        modalAttachment.innerHTML = attachmentMarkup;
+        if (modalAttachmentsSection) {
+            modalAttachmentsSection.classList.toggle("hidden", !hasAttachment);
+        }
+        modalType.textContent = type;
+        modalType.classList.remove("hidden");
+        modalTags.textContent = tags || "N/A";
+        modalCreatedBy.textContent = `Created by ${createdBy}`;
+        modalCreatedBy.classList.remove("hidden");
+        modalCreated.textContent = createdAtRelative;
+        modalCreated.classList.remove("hidden");
+        if (note.createdAt) {
+            modalCreated.setAttribute("title", createdAtExact);
+            modalCreated.setAttribute("datetime", note.createdAt);
+        } else {
+            modalCreated.removeAttribute("title");
+            modalCreated.removeAttribute("datetime");
+        }
+        const typeKey = getNoteTypeKey(note.type);
+        for (const cls of ["type-bug", "type-idea", "type-task", "type-code"]) {
+            modalType.classList.remove(cls);
+        }
+        if (typeKey) {
+            modalType.classList.add(`type-${typeKey}`);
+        }
     }
-    const typeKey = getNoteTypeKey(note.type);
-    for (const cls of ["type-bug", "type-idea", "type-task"]) {
-        modalType.classList.remove(cls);
-    }
-    if (typeKey) {
-        modalType.classList.add(`type-${typeKey}`);
-    }
+
+    modalCodeGuideActions?.classList.toggle("hidden", !asGuide);
     noteModal.hidden = false;
     syncBodyScrollLock();
-    modalCloseButton?.focus();
+    if (asGuide && modalEditButton) {
+        modalEditButton.focus();
+    } else {
+        modalCloseButton?.focus();
+    }
 }
 
 function closeModal() {
@@ -1837,6 +3324,8 @@ function closeModal() {
 
     noteModal.hidden = true;
     activeModalNote = null;
+    guideModalPresentation = false;
+    noteModal.classList.remove("note-modal--code-guide");
     closeImageZoom({ immediate: true });
     syncBodyScrollLock();
     lastFocusedElement?.focus();
@@ -2193,12 +3682,39 @@ function closeImageZoom(options = {}) {
 }
 
 function syncBodyScrollLock() {
-    const shouldLock = isNoteModalOpen() || isComposerModalOpen() || isImportModalOpen() || isScanModalOpen() || isCodePreviewModalOpen() || imageZoomOverlay;
+    const shouldLock = isNoteModalOpen() || isComposerModalOpen() || isImportModalOpen() || isCodeGuideExportModalOpen() || isScanModalOpen() || isGuideHelpModalOpen() || isCodePreviewModalOpen() || imageZoomOverlay;
     document.body.style.overflow = shouldLock ? "hidden" : "";
 }
 
 function isScanModalOpen() {
     return scanModal && !scanModal.hidden;
+}
+
+function isGuideHelpModalOpen() {
+    return guideHelpModal && !guideHelpModal.hidden;
+}
+
+let lastGuideHelpFocusedElement = null;
+
+function openGuideHelpModal() {
+    if (!guideHelpModal) {
+        return;
+    }
+
+    lastGuideHelpFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    guideHelpModal.hidden = false;
+    syncBodyScrollLock();
+    guideHelpCloseButton?.focus();
+}
+
+function closeGuideHelpModal() {
+    if (!guideHelpModal || !isGuideHelpModalOpen()) {
+        return;
+    }
+
+    guideHelpModal.hidden = true;
+    syncBodyScrollLock();
+    lastGuideHelpFocusedElement?.focus();
 }
 
 function isCodePreviewModalOpen() {
@@ -2386,6 +3902,10 @@ function getScanMarkerLabel(item) {
         return "IDEA";
     }
 
+    if (type === "code") {
+        return "DEVNOTE";
+    }
+
     return "TODO";
 }
 
@@ -2397,6 +3917,10 @@ function getScanMarkerClass(item) {
 
     if (type === "idea") {
         return "scan-result-item__marker--idea";
+    }
+
+    if (type === "code") {
+        return "scan-result-item__marker--code";
     }
 
     return "scan-result-item__marker--task";
@@ -2418,6 +3942,10 @@ function renderScanResults(items) {
         const title = escapeHtml(item.title || "Untitled");
         const filePath = escapeHtml(item.filePath || "");
         const lineNumber = Number(item.lineNumber) > 0 ? Number(item.lineNumber) : "";
+        const descriptionPreview = getGuideDescriptionPreview(item);
+        const descriptionMarkup = descriptionPreview.empty
+            ? ""
+            : `<div class="scan-result-item__description">${escapeHtml(descriptionPreview.text)}</div>`;
         return `
             <label class="scan-result-item" role="listitem" data-scan-index="${index}">
                 <input class="scan-result-item__checkbox" type="checkbox" data-scan-select checked />
@@ -2426,6 +3954,7 @@ function renderScanResults(items) {
                         <span class="scan-result-item__marker ${markerClass}">${marker}</span>
                         <span class="scan-result-item__title">${title}</span>
                     </div>
+                    ${descriptionMarkup}
                     <div class="scan-result-item__location">${filePath}${lineNumber ? ` : ${lineNumber}` : ""}</div>
                 </div>
             </label>
@@ -2607,12 +4136,16 @@ async function importSelectedScanResults() {
 
         closeScanModal();
         currentPage = 1;
-        await loadNotes({ soft: false });
+        await refreshActiveDashboard({ soft: false });
         await loadStatistics();
 
         const created = Number(payload?.created) || 0;
         const skipped = Number(payload?.skipped) || 0;
+        const updated = Number(payload?.updated) || 0;
         let successMessage = `${created} note${created === 1 ? "" : "s"} imported`;
+        if (updated > 0) {
+            successMessage += `, ${updated} updated`;
+        }
         if (skipped > 0) {
             successMessage += `, ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped`;
         }
@@ -2655,6 +4188,190 @@ function closeImportModal() {
     importModal.hidden = true;
     syncBodyScrollLock();
     lastImportModalFocusedElement?.focus();
+}
+
+let lastCodeGuideExportFocusedElement = null;
+
+function isCodeGuideExportModalOpen() {
+    return codeGuideExportModal && !codeGuideExportModal.hidden;
+}
+
+function getGuideExportFilePaths() {
+    const paths = Array.from(new Set(
+        (codeGuideSourceNotes || [])
+            .filter((note) => isCodeGuideAnnotation(note))
+            .map((note) => normalizeGuidePath(getCodeReferenceDetails(note).filePath))
+            .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    return paths;
+}
+
+function getSelectedCodeGuideExportScope() {
+    const selected = codeGuideExportForm?.querySelector('input[name="code-guide-export-scope"]:checked');
+    if (selected instanceof HTMLInputElement) {
+        return selected.value || "entireProject";
+    }
+
+    return "entireProject";
+}
+
+function syncCodeGuideExportScopeUi() {
+    const scope = getSelectedCodeGuideExportScope();
+    const showFiles = scope === "currentFile" || scope === "selectedFiles";
+    codeGuideExportFilesPanel?.classList.toggle("hidden", !showFiles);
+
+    if (!showFiles || !codeGuideExportFiles) {
+        return;
+    }
+
+    const paths = getGuideExportFilePaths();
+    const currentFile = String(guideFilterFile?.value || "all");
+    const allowMultiple = scope === "selectedFiles";
+
+    if (paths.length === 0) {
+        codeGuideExportFiles.innerHTML = `<p class="field-hint">No Code Guide files available yet.</p>`;
+        return;
+    }
+
+    codeGuideExportFiles.innerHTML = paths.map((path) => {
+        const checked = scope === "currentFile"
+            ? (currentFile !== "all" && currentFile === path)
+            : true;
+        const inputType = allowMultiple ? "checkbox" : "radio";
+        const name = allowMultiple ? "code-guide-export-file" : "code-guide-export-file-single";
+        return `
+            <label class="code-guide-export-file-option">
+                <input type="${inputType}" name="${name}" value="${escapeHtml(path)}" ${checked ? "checked" : ""} />
+                <span class="code-guide-export-file-option__path">${escapeHtml(path)}</span>
+            </label>
+        `;
+    }).join("");
+
+    if (scope === "currentFile" && currentFile === "all") {
+        const first = codeGuideExportFiles.querySelector('input[type="radio"]');
+        if (first instanceof HTMLInputElement) {
+            first.checked = true;
+        }
+    }
+}
+
+function getSelectedCodeGuideExportFilePaths() {
+    const scope = getSelectedCodeGuideExportScope();
+    if (scope === "entireProject") {
+        return [];
+    }
+
+    if (scope === "currentFile") {
+        const selected = codeGuideExportFiles?.querySelector('input[name="code-guide-export-file-single"]:checked');
+        if (selected instanceof HTMLInputElement && selected.value) {
+            return [selected.value];
+        }
+
+        const filterValue = String(guideFilterFile?.value || "all");
+        return filterValue !== "all" ? [filterValue] : [];
+    }
+
+    return Array.from(codeGuideExportFiles?.querySelectorAll('input[name="code-guide-export-file"]:checked') || [])
+        .filter((input) => input instanceof HTMLInputElement)
+        .map((input) => input.value)
+        .filter(Boolean);
+}
+
+function openCodeGuideExportModal() {
+    if (!codeGuideExportModal) {
+        return;
+    }
+
+    if (codeGuideExportForm) {
+        const entire = codeGuideExportForm.querySelector('input[name="code-guide-export-scope"][value="entireProject"]');
+        if (entire instanceof HTMLInputElement) {
+            entire.checked = true;
+        }
+    }
+
+    syncCodeGuideExportScopeUi();
+    lastCodeGuideExportFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    codeGuideExportModal.hidden = false;
+    syncBodyScrollLock();
+    codeGuideExportSubmitButton?.focus();
+}
+
+function closeCodeGuideExportModal() {
+    if (!codeGuideExportModal || codeGuideExportModal.hidden) {
+        return;
+    }
+
+    codeGuideExportModal.hidden = true;
+    syncBodyScrollLock();
+    lastCodeGuideExportFocusedElement?.focus();
+}
+
+async function exportCodeGuidePdf(event) {
+    event?.preventDefault?.();
+
+    const scope = getSelectedCodeGuideExportScope();
+    const filePaths = getSelectedCodeGuideExportFilePaths();
+
+    if ((scope === "currentFile" || scope === "selectedFiles") && filePaths.length === 0) {
+        setStatus(scope === "currentFile"
+            ? "Select a file to export."
+            : "Select at least one file to export.", true);
+        return;
+    }
+
+    if (codeGuideExportSubmitButton) {
+        codeGuideExportSubmitButton.disabled = true;
+    }
+
+    try {
+        setStatus("Generating Code Guide PDF...");
+        const response = await fetch("/devnotes/code-guide/export.pdf", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/pdf"
+            },
+            body: JSON.stringify({
+                scope,
+                filePaths
+            })
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!response.ok) {
+            let message = "Failed to generate Code Guide PDF.";
+            if (contentType.includes("application/json")) {
+                const payload = await response.json().catch(() => null);
+                if (payload?.error) {
+                    message = String(payload.error);
+                }
+            }
+            throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get("content-disposition") || "";
+        const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+        const fileName = fileNameMatch?.[1] || `code-guide-${new Date().toISOString().slice(0, 10)}.pdf`;
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = fileName;
+        link.rel = "noopener";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+        closeCodeGuideExportModal();
+        setStatus("Code Guide PDF downloaded.", false, true);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to generate Code Guide PDF.";
+        setStatus(message, true);
+    } finally {
+        if (codeGuideExportSubmitButton) {
+            codeGuideExportSubmitButton.disabled = false;
+        }
+    }
 }
 
 async function exportDevNotes() {
@@ -2755,7 +4472,7 @@ async function submitImport(event) {
 
         closeImportModal();
         currentPage = 1;
-        await loadNotes({ soft: false });
+        await refreshActiveDashboard({ soft: false });
         await loadStatistics();
 
         const importedCount = Number(payload?.importedCount) || 0;
@@ -2779,6 +4496,34 @@ async function submitImport(event) {
 
 exportButton?.addEventListener("click", () => {
     void exportDevNotes();
+});
+
+codeGuideExportButton?.addEventListener("click", () => {
+    openCodeGuideExportModal();
+});
+
+codeGuideExportForm?.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.name === "code-guide-export-scope") {
+        syncCodeGuideExportScopeUi();
+    }
+});
+
+codeGuideExportForm?.addEventListener("submit", (event) => {
+    void exportCodeGuidePdf(event);
+});
+
+codeGuideExportCancelButton?.addEventListener("click", () => {
+    closeCodeGuideExportModal();
+});
+
+codeGuideExportCloseButton?.addEventListener("click", () => {
+    closeCodeGuideExportModal();
+});
+
+codeGuideExportModal?.addEventListener("click", (event) => {
+    if (event.target === codeGuideExportModal) {
+        closeCodeGuideExportModal();
+    }
 });
 
 importButton?.addEventListener("click", () => {
@@ -2927,6 +4672,8 @@ function setStatus(message, isError = false, isSuccess = false) {
 }
 
 initializeTheme();
+restoreGuideUiState();
+syncGuideClearFiltersVisibility();
 syncStatFilterActiveState();
 if (composerModal) {
     composerModal.hidden = true;
@@ -2937,12 +4684,16 @@ if (importModal) {
 if (scanModal) {
     scanModal.hidden = true;
 }
+if (guideHelpModal) {
+    guideHelpModal.hidden = true;
+}
 if (noteModal) {
     noteModal.hidden = true;
 }
 closeComposerModal();
 closeImportModal();
 closeScanModal();
+closeGuideHelpModal();
 closeModal();
 void loadClientConfig();
 void loadStatistics();

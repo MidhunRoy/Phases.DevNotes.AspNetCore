@@ -425,7 +425,8 @@ namespace Phases.DevNotes.AspNetCore.Services
 
             if (string.Equals(value, "bug", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(value, "idea", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(value, "task", StringComparison.OrdinalIgnoreCase))
+                string.Equals(value, "task", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "code", StringComparison.OrdinalIgnoreCase))
             {
                 return value;
             }

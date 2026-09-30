@@ -62,6 +62,7 @@ namespace Phases.DevNotes.AspNetCore.Extensions
             services.TryAddScoped<IDevNotesService, DevNotesService>();
             services.TryAddScoped<ICodePreviewService, CodePreviewService>();
             services.TryAddScoped<IDevNotesScannerService, DevNotesScannerService>();
+            services.TryAddScoped<ICodeGuidePdfExportService, CodeGuidePdfExportService>();
 
             return services;
         }

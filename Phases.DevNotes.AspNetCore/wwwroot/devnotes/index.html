@@ -10,14 +10,33 @@
     <link rel="stylesheet" href="/devnotes/styles.css" />
 </head>
 <body>
-    <main class="container dashboard">
+    <main class="container dashboard" data-dashboard-mode="notes">
         <section class="panel notes-panel">
             <header class="notes-header">
-                <div class="notes-header__top">
-                    <h1 class="app-title">Dev Notes</h1>
-                    <button id="add-note-btn" class="add-note-btn" type="button" aria-label="Add new note">+ Add Note</button>
+                <div class="mode-tabs" role="tablist" aria-label="Dashboard mode">
+                    <button id="mode-notes-btn" class="mode-tab mode-tab--active" type="button" role="tab" aria-selected="true" data-dashboard-mode="notes">Notes</button>
+                    <button id="mode-code-guide-btn" class="mode-tab" type="button" role="tab" aria-selected="false" data-dashboard-mode="code-guide">Code Guide</button>
                 </div>
-                <p class="subtitle">Capture quick development notes while building.</p>
+                <div id="notes-mode-header" class="mode-header">
+                    <div class="notes-header__top">
+                        <h1 class="app-title">Dev Notes</h1>
+                        <button id="add-note-btn" class="add-note-btn" type="button" aria-label="Add new note">+ Add Note</button>
+                    </div>
+                    <p class="subtitle">Capture quick development notes while building.</p>
+                </div>
+                <div id="code-guide-mode-header" class="mode-header" hidden>
+                    <div class="notes-header__top">
+                        <div class="code-guide-heading">
+                            <h1 class="app-title">Code Guide</h1>
+                            <p class="subtitle">Understand your project through annotations.</p>
+                        </div>
+                        <div class="code-guide-header-actions">
+                            <button id="code-guide-export-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="Export Code Guide as PDF">Export Code Guide</button>
+                            <button id="code-guide-help-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="How to add code annotations">How to annotate</button>
+                            <button id="code-guide-add-note-btn" class="add-note-btn" type="button" aria-label="Add annotation">+ Add Note</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="notes-header__toolbar">
                     <div class="toolbar-actions" role="toolbar" aria-label="Dev Notes actions">
                         <button id="export-btn" class="toolbar-btn toolbar-btn--secondary" type="button" aria-label="Export notes">Export</button>
@@ -34,10 +53,11 @@
                         <span class="keyboard-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> Search</span>
                     </p>
                 </div>
-                <div class="notes-row notes-row--filters">
+                <div id="notes-mode-filters" class="notes-row notes-row--filters">
                     <input id="search" type="search" placeholder="Search notes, files, tags, code references..." aria-label="Search notes" autocomplete="off" />
                     <select id="filter-type" aria-label="Filter notes by type">
                         <option value="all">All types</option>
+                        <option value="code">🔷 Code</option>
                         <option value="bug">🐞 Bug</option>
                         <option value="idea">💡 Idea</option>
                         <option value="task">✓ Task</option>
@@ -50,11 +70,39 @@
                         <option value="oldest">Oldest first</option>
                     </select>
                 </div>
-                <div class="notes-row notes-row--summary">
+                <div id="code-guide-mode-filters" class="code-guide-filters" hidden>
+                    <div class="code-guide-filters__primary">
+                        <div class="guide-search-wrap">
+                            <input id="guide-search" type="search" placeholder="Search concepts, files, methods, tags..." aria-label="Search code guide annotations" autocomplete="off" />
+                            <button id="guide-search-clear" class="guide-search-clear hidden" type="button" aria-label="Clear search" title="Clear search">×</button>
+                        </div>
+                        <select id="guide-filter-file" aria-label="Filter by file">
+                            <option value="all">All files</option>
+                        </select>
+                        <select id="guide-filter-concept" aria-label="Filter by concept">
+                            <option value="all">All concepts</option>
+                            <option value="code">Code</option>
+                            <option value="bug">Bug</option>
+                            <option value="idea">Idea</option>
+                            <option value="task">Task</option>
+                        </select>
+                        <button id="guide-clear-filters" class="toolbar-btn toolbar-btn--secondary guide-clear-filters hidden" type="button">Clear filters</button>
+                        <button id="guide-more-filters-btn" class="toolbar-btn toolbar-btn--secondary guide-more-filters-btn" type="button" aria-expanded="false" aria-controls="guide-more-filters">More filters</button>
+                    </div>
+                    <div id="guide-more-filters" class="code-guide-filters__more hidden">
+                        <select id="guide-filter-tag" aria-label="Filter by tag">
+                            <option value="all">All tags</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="notes-mode-summary" class="notes-row notes-row--summary">
                     <div id="notes-summary" class="notes-summary" aria-live="polite"></div>
                 </div>
+                <div id="code-guide-mode-summary" class="notes-row notes-row--summary" hidden>
+                    <div id="guide-summary" class="notes-summary" aria-live="polite"></div>
+                </div>
             </header>
-            <section class="stats-section" aria-label="Dev Notes statistics">
+            <section id="notes-mode-stats" class="stats-section" aria-label="Dev Notes statistics">
                 <div class="stats-bar" role="group" aria-label="Filter notes by type">
                     <button type="button" class="stat-pill" data-stat-filter="all" aria-pressed="true" aria-label="Show all notes">
                         <span class="stat-pill__icon" aria-hidden="true">📒</span>
@@ -89,7 +137,7 @@
             </section>
             <div id="status" class="status" aria-live="polite" role="status"></div>
             <div id="notes" class="notes" aria-live="polite"></div>
-            <footer class="pagination" aria-label="Notes pagination">
+            <footer id="notes-pagination" class="pagination" aria-label="Notes pagination">
                 <button id="prev-page" type="button" aria-label="Previous page">Previous</button>
                 <span id="page-indicator" class="pagination__indicator" aria-live="polite">Page 1 of 1</span>
                 <button id="next-page" type="button" aria-label="Next page">Next</button>
@@ -107,13 +155,37 @@
                 </button>
             </header>
 
-            <section class="modal-section modal-section--description">
-                <h4 class="modal-section-title">Description</h4>
+            <section id="modal-guide-learning" class="modal-section modal-guide-learning hidden">
+                <div id="modal-guide-sections" class="guide-detail-sections"></div>
+                <div id="modal-guide-where-block" class="guide-detail-block">
+                    <h4 class="guide-detail-label">Code Location</h4>
+                    <div id="modal-guide-where" class="guide-detail-location"></div>
+                </div>
+                <div id="modal-guide-method-block" class="guide-detail-block hidden">
+                    <h4 class="guide-detail-label">Method</h4>
+                    <div id="modal-guide-method" class="guide-detail-text guide-detail-text--mono"></div>
+                </div>
+                <div id="modal-guide-tags-block" class="guide-detail-block hidden">
+                    <h4 class="guide-detail-label">Tags</h4>
+                    <div id="modal-guide-tags" class="guide-detail-tags"></div>
+                </div>
+                <details id="modal-guide-secondary" class="guide-secondary-meta">
+                    <summary>More details</summary>
+                    <div class="guide-secondary-meta__body">
+                        <div id="modal-guide-secondary-type" class="guide-secondary-meta__item"></div>
+                        <div id="modal-guide-secondary-created-by" class="guide-secondary-meta__item"></div>
+                        <div id="modal-guide-secondary-created" class="guide-secondary-meta__item"></div>
+                    </div>
+                </details>
+            </section>
+
+            <section class="modal-section modal-section--description" data-notes-only-section>
+                <h4 id="modal-description-title" class="modal-section-title">Description</h4>
                 <div id="modal-description" class="modal-description"></div>
             </section>
 
-            <section class="modal-section modal-section--metadata">
-                <h4 class="modal-section-title">Metadata</h4>
+            <section class="modal-section modal-section--metadata" data-notes-only-section>
+                <h4 id="modal-metadata-title" class="modal-section-title">Metadata</h4>
                 <div class="modal-meta-items">
                     <div id="modal-type" class="meta meta--type"></div>
                     <div id="modal-tags" class="meta meta--tags"></div>
@@ -122,8 +194,8 @@
                 </div>
             </section>
 
-            <section id="modal-code-reference-section" class="modal-section modal-section--code-reference hidden">
-                <h4 class="modal-section-title">Code Reference</h4>
+            <section id="modal-code-reference-section" class="modal-section modal-section--code-reference hidden" data-notes-only-section>
+                <h4 id="modal-code-reference-title" class="modal-section-title">Code Reference</h4>
                 <div id="modal-code-reference" class="modal-code-reference">
                     <div id="modal-code-file" class="modal-code-reference__file"></div>
                     <div id="modal-code-method" class="modal-code-reference__item"></div>
@@ -132,10 +204,15 @@
                 </div>
             </section>
 
-            <section id="modal-attachments-section" class="modal-section modal-section--attachments">
+            <section id="modal-attachments-section" class="modal-section modal-section--attachments" data-notes-only-section>
                 <h4 class="modal-section-title">Attachments</h4>
                 <div id="modal-attachment" class="modal-attachment"></div>
             </section>
+
+            <footer id="modal-code-guide-actions" class="modal-actions modal-actions--code-guide hidden">
+                <button id="modal-edit-btn" class="add-note-btn" type="button">Edit</button>
+                <button id="modal-close-action-btn" class="secondary-btn" type="button">Close</button>
+            </footer>
         </article>
     </div>
 
@@ -168,7 +245,7 @@
                 </div>
 
                 <label for="type">Type</label>
-                <input id="type" name="type" type="text" placeholder="bug, idea, task..." />
+                <input id="type" name="type" type="text" placeholder="code, bug, idea, task..." />
 
                 <label for="tags">Tags</label>
                 <input id="tags" name="tags" type="text" placeholder="api, auth, perf" />
@@ -265,6 +342,95 @@
                     <button id="import-cancel-btn" type="button" class="secondary-btn import-cancel-btn">Cancel</button>
                 </div>
             </form>
+        </article>
+    </div>
+
+    <div id="code-guide-export-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="code-guide-export-title">
+        <article class="modal code-guide-export-modal">
+            <header class="modal__header">
+                <h2 id="code-guide-export-title" class="modal-title">Export Code Guide</h2>
+                <button id="code-guide-export-close" class="modal-close" type="button" aria-label="Close export dialog">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <form id="code-guide-export-form" class="code-guide-export-form">
+                <fieldset class="import-mode-fieldset">
+                    <legend class="import-mode-legend">Scope</legend>
+                    <label class="import-mode-option">
+                        <input type="radio" name="code-guide-export-scope" value="currentFile" />
+                        Current file
+                    </label>
+                    <label class="import-mode-option">
+                        <input type="radio" name="code-guide-export-scope" value="selectedFiles" />
+                        Selected files
+                    </label>
+                    <label class="import-mode-option">
+                        <input type="radio" name="code-guide-export-scope" value="entireProject" checked />
+                        Entire project
+                    </label>
+                </fieldset>
+                <div id="code-guide-export-files-panel" class="code-guide-export-files-panel hidden">
+                    <p class="code-guide-export-files-label">Select files</p>
+                    <div id="code-guide-export-files" class="code-guide-export-files" role="group" aria-label="Files to export"></div>
+                </div>
+                <fieldset class="import-mode-fieldset">
+                    <legend class="import-mode-legend">Format</legend>
+                    <label class="import-mode-option">
+                        <input type="radio" name="code-guide-export-format" value="pdf" checked disabled />
+                        PDF
+                    </label>
+                </fieldset>
+                <p id="code-guide-export-hint" class="field-hint">Creates a learning guide with Code Map, explanations, examples, and related source snippets.</p>
+                <div class="form-actions">
+                    <button id="code-guide-export-submit" type="submit">Generate PDF</button>
+                    <button id="code-guide-export-cancel" type="button" class="secondary-btn">Cancel</button>
+                </div>
+            </form>
+        </article>
+    </div>
+
+    <div id="guide-help-modal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="guide-help-title">
+        <article class="modal guide-help-modal" data-modal-content>
+            <header class="modal__header">
+                <h2 id="guide-help-title" class="modal-title">How to annotate code</h2>
+                <button id="guide-help-close" class="modal-close" type="button" aria-label="Close help">
+                    <svg class="modal-close__icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </header>
+            <div class="guide-help-body">
+                <p class="guide-help-intro">Add short learning notes in your source files, then scan so they appear in Code Guide.</p>
+
+                <h3 class="guide-help-step-title">1. Write a DEVNOTE in code</h3>
+                <pre class="guide-help-code" tabindex="0"><code>// DEVNOTE: WebApplicationBuilder
+// What: Creates a builder used to prepare an ASP.NET Core application.
+// Why: It sets up configuration, logging and services.
+// Why here: We use the builder to configure the application.
+// Example: `var builder = WebApplication.CreateBuilder(args);`</code></pre>
+                <ul class="guide-help-list">
+                    <li><strong>First line</strong> after <code>DEVNOTE:</code> becomes the title.</li>
+                    <li><strong>Structured lines</strong> (<code>What:</code>, <code>Why:</code>, <code>Why here:</code>, <code>Advantage:</code>, <code>How:</code>, <code>Example:</code>) become learning sections. All fields are optional.</li>
+                    <li>File path and line number are captured automatically.</li>
+                </ul>
+
+                <h3 class="guide-help-step-title">2. Scan the project</h3>
+                <p class="guide-help-copy">Click <strong>Scan Project</strong>, select the DEVNOTE results, then <strong>Import Selected</strong>.</p>
+
+                <h3 class="guide-help-step-title">3. Browse in Code Guide</h3>
+                <p class="guide-help-copy">Open the <strong>Code Guide</strong> tab. Annotations are grouped by file and sorted by line number. Search for concepts like <em>middleware</em> or <em>dependency</em>.</p>
+
+                <h3 class="guide-help-step-title">Also supported</h3>
+                <pre class="guide-help-code" tabindex="0"><code>/*
+ DEVNOTE: Middleware
+ What: Code that runs while an HTTP request travels through the application.
+ Why: Common request processing can be handled in one place.
+ Example: Request → Middleware → Endpoint → Response
+*/</code></pre>
+                <p class="guide-help-note">Work notes still use <code>TODO</code>, <code>FIXME</code>, <code>BUG</code>, <code>IDEA</code>, etc. Those stay in <strong>Notes</strong>. Use <code>DEVNOTE</code> for learning annotations.</p>
+            </div>
+            <div class="form-actions guide-help-actions">
+                <button id="guide-help-scan-btn" type="button" class="add-note-btn">Scan Project</button>
+                <button id="guide-help-close-btn" type="button" class="secondary-btn">Close</button>
+            </div>
         </article>
     </div>
 

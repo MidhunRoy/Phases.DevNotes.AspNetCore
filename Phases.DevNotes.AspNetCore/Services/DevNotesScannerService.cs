@@ -169,13 +169,24 @@ namespace Phases.DevNotes.AspNetCore.Services
             var existingNotes = _devNotesService.GetAll();
             var created = 0;
             var skipped = 0;
+            var updated = 0;
             var author = string.IsNullOrWhiteSpace(createdBy) ? "Unknown" : createdBy.Trim();
 
             foreach (var scanned in resolvedNotes)
             {
-                if (IsDuplicate(existingNotes, scanned))
+                var existing = FindExistingNote(existingNotes, scanned);
+                if (existing is not null)
                 {
-                    skipped++;
+                    if (TryRefreshExistingFromScan(existing, scanned))
+                    {
+                        _devNotesService.Update(existing.Id, existing);
+                        updated++;
+                    }
+                    else
+                    {
+                        skipped++;
+                    }
+
                     continue;
                 }
 
@@ -199,7 +210,8 @@ namespace Phases.DevNotes.AspNetCore.Services
             return new ScanImportResult
             {
                 Created = created,
-                Skipped = skipped
+                Skipped = skipped,
+                Updated = updated
             };
         }
 
@@ -229,15 +241,89 @@ namespace Phases.DevNotes.AspNetCore.Services
             return resolved;
         }
 
-        private static bool IsDuplicate(IEnumerable<DevNote> existingNotes, ScannedNote scanned)
+        private static DevNote? FindExistingNote(IEnumerable<DevNote> existingNotes, ScannedNote scanned)
         {
             var path = NormalizeRelativePath(scanned.FilePath);
             var title = scanned.Title?.Trim() ?? string.Empty;
+            var scannedLine = scanned.LineNumber > 0 ? scanned.LineNumber : (int?)null;
 
-            return existingNotes.Any(note =>
+            // Exact match: same file + line + title (unchanged on disk).
+            var exact = existingNotes.FirstOrDefault(note =>
                 string.Equals(NormalizeRelativePath(note.FilePath), path, StringComparison.OrdinalIgnoreCase) &&
-                note.LineNumber == scanned.LineNumber &&
+                note.LineNumber == scannedLine &&
                 string.Equals((note.Title ?? string.Empty).Trim(), title, StringComparison.OrdinalIgnoreCase));
+            if (exact is not null)
+            {
+                return exact;
+            }
+
+            // Code Guide annotations: match by file + title so a moved DEVNOTE
+            // can refresh its LineNumber after a rescan instead of duplicating.
+            if (!IsCodeGuideScannedNote(scanned))
+            {
+                return null;
+            }
+
+            return existingNotes.FirstOrDefault(note =>
+                IsCodeGuideStoredNote(note) &&
+                string.Equals(NormalizeRelativePath(note.FilePath), path, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals((note.Title ?? string.Empty).Trim(), title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool TryRefreshExistingFromScan(DevNote existing, ScannedNote scanned)
+        {
+            var nextLine = scanned.LineNumber > 0 ? scanned.LineNumber : (int?)null;
+            var nextMethod = scanned.MethodName ?? string.Empty;
+            var nextDescription = scanned.Description ?? string.Empty;
+
+            var lineChanged = existing.LineNumber != nextLine;
+            var methodChanged = !string.Equals(existing.MethodName ?? string.Empty, nextMethod, StringComparison.Ordinal);
+            var descriptionChanged = !string.IsNullOrWhiteSpace(nextDescription)
+                && !string.Equals(existing.Description ?? string.Empty, nextDescription, StringComparison.Ordinal);
+
+            if (!lineChanged && !methodChanged && !descriptionChanged)
+            {
+                return false;
+            }
+
+            existing.LineNumber = nextLine;
+            if (methodChanged)
+            {
+                existing.MethodName = nextMethod;
+            }
+
+            if (descriptionChanged)
+            {
+                existing.Description = nextDescription;
+            }
+
+            return true;
+        }
+
+        private static bool IsCodeGuideScannedNote(ScannedNote scanned)
+        {
+            if (string.Equals(scanned.Type, "code", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return scanned.Tags is not null
+                && scanned.Tags.Any(tag =>
+                    string.Equals(tag, "code", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(tag, "devnote", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsCodeGuideStoredNote(DevNote note)
+        {
+            if (string.Equals(note.Type, "code", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return note.Tags is not null
+                && note.Tags.Any(tag =>
+                    string.Equals(tag, "code", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(tag, "devnote", StringComparison.OrdinalIgnoreCase));
         }
 
         private bool ShouldScanFile(string fullPath, out string relativePath)
